@@ -1,4 +1,4 @@
-"""Prepare and aggregate genuine human LMP annotations.
+﻿"""Prepare and aggregate genuine human LMP annotations.
 
 Existing generated labels are synthetic. This tool creates a blank annotation
 sheet and aggregates actual ratings supplied by independent human annotators.
@@ -49,9 +49,13 @@ def aggregate_annotations(input_path, output_path, min_annotators=2):
         error_types=("error_types", lambda x: ";".join(sorted({e.strip() for cell in x for e in str(cell).split(";") if e.strip()}))),
         annotation_notes=("notes", lambda x: " | ".join(str(v) for v in x if str(v).strip())),
     ).reset_index()
-    grouped["lmp_score"] = grouped["human_lmp_score"]  # compatible with train.py / baselines.py\n    grouped["decision"] = pd.cut(
-        grouped["human_lmp_score"], bins=[0, 5, 8, 10],
-        labels=["Not Preserved", "Partially Preserved", "Preserved"], include_lowest=True
+    grouped["lmp_score"] = grouped["human_lmp_score"]
+
+    grouped["decision"] = pd.cut(
+        grouped["human_lmp_score"],
+        bins=[0, 5, 8, 10],
+        labels=["Not Preserved", "Partially Preserved", "Preserved"],
+        include_lowest=True
     ).astype(str)
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     grouped.to_csv(output_path, index=False, encoding="utf-8-sig")
@@ -74,3 +78,4 @@ if __name__ == "__main__":
         prepare_template(args.data, args.out)
     else:
         aggregate_annotations(args.input, args.out, args.min_annotators)
+
