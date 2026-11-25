@@ -1,5 +1,7 @@
 # Explainable Multilingual Legal Meaning Preservation Using JUDGEBERT
 
+> **Research integrity note (read before reporting results):** The checked-in 334-pair dataset is template-generated and its LMP scores are simulated, not human annotations. Its domain labels are randomly assigned and cannot support a domain-generalization claim. Treat it as development/smoke-test data only. A blank human annotation sheet and annotation tools are provided; empirical claims require genuine independent ratings and saved held-out evaluation outputs.
+
 **CSET 346 – Natural Language Processing**  
 **Project Title:** Explainable Multilingual Legal Meaning Preservation Using JUDGEBERT
 
@@ -124,3 +126,17 @@ This educational project is released for academic use. When using the code or id
 ---
 
 *Built as a professional, reproducible extension of JUDGEBERT for multilingual (English–Hindi) legal meaning preservation.*
+
+
+## Human annotation and research-compliance workflow
+
+- Annotation rubric: `docs/annotation_guidelines.md`
+- Blank sheet (334 pairs): `data/human_annotation_template.csv`
+- Prepare a fresh sheet: `python src/annotation_tools.py template`
+- Aggregate completed ratings (at least two independent annotators per pair):
+  `python src/annotation_tools.py aggregate --input data/human_annotations_filled.csv`
+- Experiment requirements and evidence checklist: `docs/experiment_protocol.md`
+- Starting bilingual sanity suite: `docs/sanity_test_cases.csv`
+- Research status and claim limits: `README_RESEARCH_STATUS.md`
+
+Do not present synthetic labels as human judgments, randomly assigned domains as domain generalization, or model superiority as established without a fair held-out comparison.
