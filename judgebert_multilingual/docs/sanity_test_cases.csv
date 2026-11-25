@@ -1,0 +1,16 @@
+case_id,language,category,original,simplified,expected_direction
+S01,en,identical,"The tenant shall pay rent by the fifth day of each month.","The tenant shall pay rent by the fifth day of each month.",high
+S02,en,unrelated,"The tenant shall pay rent by the fifth day of each month.","The capital of France is Paris.",low
+S03,en,negation,"The insurer is not liable for flood damage.","The insurer is liable for flood damage.",low
+S04,en,modality,"The tenant must provide written notice.","The tenant may provide written notice.",lower
+S05,en,deadline,"The claim must be filed within 30 days.","The claim must be filed within 60 days.",lower
+S06,en,exception,"The policy excludes damage caused by wear and tear, except where expressly covered.","The policy excludes all damage caused by wear and tear.",review
+S07,en,party,"The contractor shall pay the subcontractor.","The subcontractor shall pay the contractor.",low
+S08,en,scope,"This clause applies only to commercial tenants.","This clause applies to all tenants.",lower
+S09,hi,identical,"किरायेदार प्रत्येक माह की पांच तारीख तक किराया देगा।","किरायेदार प्रत्येक माह की पांच तारीख तक किराया देगा।",high
+S10,hi,unrelated,"किरायेदार प्रत्येक माह की पांच तारीख तक किराया देगा।","भारत की राजधानी नई दिल्ली है।",low
+S11,hi,negation,"बीमाकर्ता बाढ़ से हुई क्षति के लिए उत्तरदायी नहीं होगा।","बीमाकर्ता बाढ़ से हुई क्षति के लिए उत्तरदायी होगा।",low
+S12,hi,modality,"किरायेदार को लिखित सूचना देनी होगी।","किरायेदार लिखित सूचना दे सकता है।",lower
+S13,hi,deadline,"दावा 30 दिनों के भीतर दर्ज करना होगा।","दावा 60 दिनों के भीतर दर्ज करना होगा।",lower
+S14,hi,party,"ठेकेदार उप-ठेकेदार को भुगतान करेगा।","उप-ठेकेदार ठेकेदार को भुगतान करेगा।",low
+S15,hi,scope,"यह शर्त केवल वाणिज्यिक किरायेदारों पर लागू होगी।","यह शर्त सभी किरायेदारों पर लागू होगी।",lower
