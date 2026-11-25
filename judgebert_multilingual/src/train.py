@@ -23,7 +23,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GroupShuffleSplit
 
 from model import JudgeBERTRegressor, get_tokenizer, prepare_pair
 from utils import load_dataset, compute_metrics, print_metrics, save_results
@@ -184,17 +184,27 @@ def main(args):
     df = load_dataset(args.data)
     print(f"Loaded {len(df)} pairs")
 
-    if args.augment:
-        df = augment_with_sanity_pairs(df, n_identical=args.n_aug_identical, n_unrelated=args.n_aug_unrelated)
+    # Group by source clause so variants of the same original cannot leak across
+    # train/validation/test. Split BEFORE augmentation; synthetic sanity examples
+    # are added to training only.
+    groups = df["language"].astype(str) + "::" + df["original"].astype(str).str.strip()
+    first = GroupShuffleSplit(n_splits=1, test_size=0.30, random_state=args.seed)
+    train_idx, temp_idx = next(first.split(df, groups=groups))
+    train_df = df.iloc[train_idx].copy()
+    temp_df = df.iloc[temp_idx].copy()
+    second = GroupShuffleSplit(n_splits=1, test_size=0.50, random_state=args.seed + 1)
+    val_rel, test_rel = next(second.split(temp_df, groups=(
+        temp_df["language"].astype(str) + "::" + temp_df["original"].astype(str).str.strip()
+    )))
+    val_df = temp_df.iloc[val_rel].copy()
+    test_df = temp_df.iloc[test_rel].copy()
 
-    # Stratified split by language
-    train_df, temp_df = train_test_split(
-        df, test_size=0.30, random_state=args.seed, stratify=df["language"]
-    )
-    val_df, test_df = train_test_split(
-        temp_df, test_size=0.50, random_state=args.seed, stratify=temp_df["language"]
-    )
-    print(f"Split → Train: {len(train_df)} | Val: {len(val_df)} | Test: {len(test_df)}")
+    if args.augment:
+        train_df = augment_with_sanity_pairs(
+            train_df, n_identical=args.n_aug_identical, n_unrelated=args.n_aug_unrelated
+        )
+    print(f"Group split → Train: {len(train_df)} | Val: {len(val_df)} | Test: {len(test_df)}")
+    print("Leakage control: grouped by language + original clause; augmentation restricted to training.")
 
     tokenizer = get_tokenizer(args.model_name)
     model = JudgeBERTRegressor(
@@ -333,8 +343,8 @@ if __name__ == "__main__":
     parser.add_argument("--grad_accum", type=int, default=1)
     parser.add_argument("--fp16", action="store_true", help="Use mixed precision")
     parser.add_argument("--freeze_base", action="store_true", help="Freeze encoder (train head only)")
-    parser.add_argument("--augment", action="store_true", default=True,
-                        help="Add identical/unrelated pairs (JUDGEBERT-DA style)")
+    parser.add_argument("--augment", action=argparse.BooleanOptionalAction, default=True,
+                        help="Add identical/unrelated pairs to training only (use --no-augment to disable)")
     parser.add_argument("--n_aug_identical", type=int, default=40)
     parser.add_argument("--n_aug_unrelated", type=int, default=40)
     parser.add_argument("--patience", type=int, default=3, help="Early stopping patience")
