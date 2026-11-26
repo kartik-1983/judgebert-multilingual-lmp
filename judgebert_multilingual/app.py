@@ -341,14 +341,14 @@ def do_login(username, password):
 def do_signup(username, password, confirm):
     username = (username or "").strip()
     if not USERNAME_RE.match(username):
-        return _stay(_msg("Username must be 3-32 characters: letters, numbers, . _ -")) + (password, confirm)
+        return _stay(_msg("Username must be 3-32 characters: letters, numbers, . _ -")) + (password, confirm, render_history(None))
     if len(password or "") < MIN_PASSWORD:
-        return _stay(_msg(f"Password must be at least {MIN_PASSWORD} characters.")) + (password, confirm)
+        return _stay(_msg(f"Password must be at least {MIN_PASSWORD} characters.")) + (password, confirm, render_history(None))
     if password != confirm:
-        return _stay(_msg("The two passwords do not match.")) + (password, confirm)
+        return _stay(_msg("The two passwords do not match.")) + (password, confirm, render_history(None))
     with _USERS_LOCK:
         if username.lower() in _load_users():
-            return _stay(_msg("That username is taken. Choose another.")) + (password, confirm)
+            return _stay(_msg("That username is taken. Choose another.")) + (password, confirm, render_history(None))
         _add_user(username, password)
     return _enter(username, "") + ("", "", render_history(username))
 
