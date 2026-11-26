@@ -334,8 +334,8 @@ def _stay(msg_html):
 def do_login(username, password):
     ok, info = verify_login(username, password)
     if not ok:
-        return _stay(_msg(info)) + ("",)          # also clears the password box
-    return _enter(info, "") + ("",)
+        return _stay(_msg(info)) + ("", render_history(None))  # also clears the password box
+    return _enter(info, "") + ("", render_history(info))
 
 
 def do_signup(username, password, confirm):
@@ -350,7 +350,7 @@ def do_signup(username, password, confirm):
         if username.lower() in _load_users():
             return _stay(_msg("That username is taken. Choose another.")) + (password, confirm)
         _add_user(username, password)
-    return _enter(username, "") + ("", "")
+    return _enter(username, "") + ("", "", render_history(username))
 
 
 def do_logout():
@@ -1411,13 +1411,13 @@ def build_demo():
         auth_outputs = [session, login_view, app_view]
 
         login_args = dict(fn=do_login, inputs=[li_user, li_pass],
-                          outputs=auth_outputs + [li_msg, user_badge, li_pass], show_progress="hidden")
+                          outputs=auth_outputs + [li_msg, user_badge, li_pass, history_html], show_progress="hidden")
         li_btn.click(**login_args)
         li_pass.submit(**login_args)     # Enter key
         li_user.submit(**login_args)
 
         signup_args = dict(fn=do_signup, inputs=[su_user, su_pass, su_pass2],
-                           outputs=auth_outputs + [su_msg, user_badge, su_pass, su_pass2], show_progress="hidden")
+                           outputs=auth_outputs + [su_msg, user_badge, su_pass, su_pass2, history_html], show_progress="hidden")
         su_btn.click(**signup_args)
         su_pass2.submit(**signup_args)
 
