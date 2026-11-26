@@ -7,7 +7,7 @@ import re
 
 MODALS = {
     "mandatory": re.compile(r"\b(?:must|shall|required to|is required to|is obligated to|deberá|debe|muss|doit)\b", re.I),
-    "discretionary": re.compile(r"\b(?:may|might|can|could|is permitted to|is allowed to|podrá|puede|kann|peut)\b", re.I),
+    "discretionary": re.compile(r"\b(?:may|might|can|could|should|ought to|is permitted to|is allowed to|podrá|puede|kann|peut)\b", re.I),
     "prohibitive": re.compile(r"\b(?:must not|shall not|may not|cannot|prohibited|forbidden|no deberá|no debe|darf nicht|ne doit pas)\b", re.I),
 }
 CONDITION = re.compile(r"\b(?:if|unless|except|provided that|subject to|only if|when|where|salvo|excepto|wenn|sauf|siempre que)\b", re.I)
