@@ -17,7 +17,7 @@ import gradio as gr
 import torch
 
 from src.legal_data import ALL, CATEGORIES, COUNTRIES, REVIEWED
-from src.legal_checks import analyze_changes
+from src.legal_checks import analyze_changes, review_dimensions
 
 MODEL = None
 TOKENIZER = None
@@ -329,23 +329,30 @@ CIRC = 339.29  # circumference of the gauge ring (r = 54)
 
 def findings_html(findings, score):
     esc = _html.escape
+    dimensions = review_dimensions(findings)
+    cards = "".join(
+        '<div class="plx-dimension ' + ('plx-dimension-warn' if item["flagged"] else 'plx-dimension-ok') + '">'
+        + '<b>' + esc(item["label"]) + '</b><span>' + esc(item["status"]) + '</span></div>'
+        for item in dimensions
+    )
     if findings:
         kinds = []
         for f in findings:
             if f["kind"] not in [k for k, _ in kinds]:
                 kinds.append((f["kind"], f["severity"]))
         chips = "".join(f'<span class="plx-flag plx-sev-{sev}">{esc(k)}</span>' for k, sev in kinds)
-        notes = "".join(f"<li>{esc(f['detail'])}</li>" for f in findings[:4])
+        notes = "".join(f"<li>{esc(f['detail'])}</li>" for f in findings[:6])
         review = ""
-        if score >= 8.0 and any(f["severity"] == "high" for f in findings):
-            review = ('<p class="plx-review">The model scored this as preserved, but the checks found a high-risk change. '
-                      'Read the flagged parts before trusting the score.</p>')
+        if any(f["severity"] == "high" for f in findings):
+            review = ('<p class="plx-review">The model score is shown separately. Rule-based checks flagged a potentially material change; review the clause before relying on the score.</p>')
         body = f'<div class="plx-flags">{chips}</div><ul class="plx-notes">{notes}</ul>{review}'
     else:
-        body = ('<div class="plx-flags"><span class="plx-flag plx-sev-none">None detected</span></div>'
-                '<ul class="plx-notes"><li>No change to negation, obligations, numbers, conditions, exceptions or scope was found.</li></ul>')
-    return ('<div class="plx-find"><span class="plx-find-title">Legal error type and what changed</span>' + body +
-            '<p class="plx-fine">Rule-based check for English, German, Spanish and Hindi. It can miss or over-flag changes.</p></div>')
+        body = ('<div class="plx-flags"><span class="plx-flag plx-sev-none">No potential changes detected</span></div>'
+                '<ul class="plx-notes"><li>These heuristic checks did not identify a difference in the five review categories. This does not prove legal equivalence.</li></ul>')
+    return ('<div class="plx-find"><span class="plx-find-title">Five legal meaning review dimensions</span>'
+            '<div class="plx-dimensions">' + cards + '</div>'
+            '<span class="plx-find-title">Potential changes and explanation</span>' + body +
+            '<p class="plx-fine">Advisory rule-based checks. They can miss or over-flag changes and are not legal determinations.</p></div>')
 
 
 def result_html(score, decision, tone, blurb, language, method, findings=None):
@@ -446,17 +453,21 @@ def predict_lmp(original, simplified, language, session):
     if elapsed < 0.6:
         time.sleep(0.6 - elapsed)
 
-    if score >= 8.0:
+    findings = analyze_changes(original, simplified)
+    high_risk = any(item["severity"] == "high" for item in findings)
+    if high_risk:
+        decision, tone = "Review required", "mid"
+        blurb = "The model score is an estimate, but a rule-based check flagged a potentially material change."
+    elif score >= 8.0:
         decision, tone = "Preserved", "ok"
-        blurb = "The simplified text stays close to the meaning of the original."
+        blurb = "The model score is high and no potential change was flagged by the advisory checks."
     elif score >= 5.0:
         decision, tone = "Partially preserved", "mid"
-        blurb = "Some meaning is kept. Check conditions, exceptions and scope before using it."
+        blurb = "Some meaning may be kept. Review all five legal meaning dimensions."
     else:
         decision, tone = "Not preserved", "bad"
-        blurb = "The simplified text likely changes or drops legal meaning. Review it before use."
+        blurb = "The model predicts a substantial difference. Review the original clause before use."
 
-    findings = analyze_changes(original, simplified)
     yield result_html(score, decision, tone, blurb, language, method, findings), score, decision
 
 
@@ -1025,6 +1036,16 @@ body::after  { right: 0; border-left: 1px solid;  border-image: linear-gradient(
 .plx-cat-courts-language { background: #f1e7da; color: #7a4b1d; }
 .plx-disclaimer { margin: 1.4rem 0 0; padding: .8rem 1rem; font-size: .82rem; line-height: 1.5; color: var(--muted); border-left: 3px solid var(--seal); background: rgba(47, 75, 255, .05); border-radius: 0 10px 10px 0; }
 @media (max-width: 760px) { .plx-cinfo { grid-template-columns: 1fr; } }
+
+/* ---------- Five legal meaning review dimensions ---------- */
+.plx-dimensions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.45rem; margin:.55rem 0 .9rem; }
+.plx-dimension { display:flex; flex-direction:column; gap:.18rem; padding:.55rem .65rem; border:1px solid rgba(148,163,184,.22); border-radius:9px; background:rgba(15,27,45,.28); min-width:0; }
+.plx-dimension b { color:#e2e8f0; font-size:.76rem; }
+.plx-dimension span { font-size:.72rem; line-height:1.35; }
+.plx-dimension-ok span { color:#5fdc9f; }
+.plx-dimension-warn { border-color:rgba(244,193,77,.45); background:rgba(232,169,18,.09); }
+.plx-dimension-warn span { color:#f4c14d; }
+@media (max-width:640px) { .plx-dimensions { grid-template-columns:1fr; } }
 
 /* ---------- Findings inside the result card ---------- */
 .plx-find { margin-bottom: 1.3rem; animation: plx-rise .6s 1.05s var(--ease) both; }
