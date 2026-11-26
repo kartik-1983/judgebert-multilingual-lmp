@@ -1038,27 +1038,28 @@ body::after  { right: 0; border-left: 1px solid;  border-image: linear-gradient(
 @media (max-width: 760px) { .plx-cinfo { grid-template-columns: 1fr; } }
 
 /* ---------- Five legal meaning review dimensions ---------- */
-.plx-dimensions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.45rem; margin:.55rem 0 .9rem; }
-.plx-dimension { display:flex; flex-direction:column; gap:.18rem; padding:.55rem .65rem; border:1px solid rgba(148,163,184,.22); border-radius:9px; background:rgba(15,27,45,.28); min-width:0; }
-.plx-dimension b { color:#e2e8f0; font-size:.76rem; }
-.plx-dimension span { font-size:.72rem; line-height:1.35; }
-.plx-dimension-ok span { color:#5fdc9f; }
-.plx-dimension-warn { border-color:rgba(244,193,77,.45); background:rgba(232,169,18,.09); }
-.plx-dimension-warn span { color:#f4c14d; }
+.plx-dimensions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.6rem; margin:.7rem 0 1.1rem; }
+.plx-dimension { display:flex; flex-direction:column; gap:.28rem; padding:.7rem .75rem; border:1px solid rgba(148,163,184,.28); border-radius:10px; background:rgba(15,27,45,.48); min-width:0; }
+.plx-dimension b { color:#f1f5f9 !important; font-size:.8rem; line-height:1.35; }
+.plx-dimension span { font-size:.76rem; line-height:1.4; color:#e2e8f0 !important; }
+.plx-dimension-ok span { color:#6ee7ad !important; }
+.plx-dimension-warn { border-color:rgba(244,193,77,.62); background:rgba(232,169,18,.13); }
+.plx-dimension-warn span { color:#ffd166 !important; }
 @media (max-width:640px) { .plx-dimensions { grid-template-columns:1fr; } }
 
 /* ---------- Findings inside the result card ---------- */
-.plx-find { margin-bottom: 1.3rem; animation: plx-rise .6s 1.05s var(--ease) both; }
-.plx-find-title { display: block; font-size: .78rem; color: #7c8aa5; margin-bottom: .5rem; }
-.plx-flags { display: flex; flex-wrap: wrap; gap: .4rem; }
-.plx-flag { padding: .25rem .7rem; border-radius: 999px; font-size: .8rem; font-weight: 600; border: 1px solid; }
-.plx-sev-high   { color: #ff8a86; background: rgba(239, 83, 80, .14); border-color: rgba(239, 83, 80, .4); }
-.plx-sev-medium { color: #f4c14d; background: rgba(232, 169, 18, .14); border-color: rgba(232, 169, 18, .4); }
-.plx-sev-none   { color: #5fdc9f; background: rgba(40, 194, 122, .14); border-color: rgba(40, 194, 122, .4); }
-.plx-notes { margin: .7rem 0 0; padding-left: 1.1rem; font-size: .88rem; line-height: 1.5; color: #cbd5e1; }
-.plx-notes li { margin-bottom: .25rem; }
-.plx-review { margin: .7rem 0 0; padding: .55rem .8rem; font-size: .85rem; line-height: 1.45; color: #f4c14d; background: rgba(232, 169, 18, .1); border-left: 3px solid #e8a912; border-radius: 0 8px 8px 0; }
-.plx-fine { margin: .6rem 0 0; font-size: .74rem; color: #64748b; }
+.plx-find { margin-bottom: 1.4rem; animation: plx-rise .6s 1.05s var(--ease) both; }
+.plx-find-title { display:block; font-size:.82rem; font-weight:650; letter-spacing:.01em; color:#cbd5e1 !important; margin:1rem 0 .65rem; }
+.plx-flags { display:flex; flex-wrap:wrap; gap:.5rem; }
+.plx-flag { padding:.3rem .75rem; border-radius:999px; font-size:.82rem; font-weight:650; border:1px solid; }
+.plx-sev-high   { color:#ffaaa5; background:rgba(239,83,80,.17); border-color:rgba(255,138,134,.55); }
+.plx-sev-medium { color:#ffd166; background:rgba(232,169,18,.16); border-color:rgba(244,193,77,.55); }
+.plx-sev-none   { color:#6ee7ad; background:rgba(40,194,122,.15); border-color:rgba(40,194,122,.5); }
+.plx-notes { margin:.8rem 0 0 !important; padding:.8rem .9rem .8rem 2rem !important; border:1px solid rgba(148,163,184,.22); border-radius:10px; background:rgba(8,18,34,.42); font-size:.9rem !important; line-height:1.65 !important; color:#e2e8f0 !important; }
+.plx-notes li { margin:0 0 .45rem !important; color:#e2e8f0 !important; padding-left:.15rem; }
+.plx-notes li:last-child { margin-bottom:0 !important; }
+.plx-review { margin:.85rem 0 0 !important; padding:.75rem .9rem !important; font-size:.9rem !important; line-height:1.55 !important; font-weight:550; color:#ffe08a !important; background:rgba(232,169,18,.13); border:1px solid rgba(244,193,77,.3); border-left:4px solid #f4c14d; border-radius:0 10px 10px 0; }
+.plx-fine { margin:.85rem 0 0 !important; font-size:.8rem !important; line-height:1.5 !important; color:#aebdd2 !important; }
 
 /* ---------- Model status pill ---------- */
 .plx-model { display: inline-flex; align-items: center; gap: .5rem; padding: .35rem .9rem; border-radius: 999px; font-size: .82rem; background: var(--surface); border: 1px solid var(--line); color: var(--ink-2); animation: plx-rise .5s .1s var(--ease) both; }
