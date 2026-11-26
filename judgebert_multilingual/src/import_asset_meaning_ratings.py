@@ -6,6 +6,7 @@ legal LMP 1-10 scores or merge them into legal training labels.
 """
 import argparse
 import json
+import hashlib
 from pathlib import Path
 import pandas as pd
 from datasets import load_dataset
@@ -54,7 +55,9 @@ def main():
                       ratings=("rating", lambda x: json.dumps([float(v) for v in x])))
                  .reset_index())
     grouped["pair_id"] = grouped.apply(
-        lambda r: f"asset_{int(r['original_sentence_id'])}_{abs(hash(r['simplification'])) % 10**10}",
+        lambda r: "asset_" + hashlib.sha1(
+            (str(r["original_sentence_id"]) + "|" + r["simplification"]).encode("utf-8")
+        ).hexdigest()[:16],
         axis=1
     )
     grouped["rating_scale"] = "0-100"
