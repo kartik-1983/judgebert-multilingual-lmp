@@ -14,7 +14,6 @@ import time
 from pathlib import Path
 
 import gradio as gr
-import numpy as np
 import torch
 
 from src.legal_data import ALL, CATEGORIES, COUNTRIES, REVIEWED
@@ -24,9 +23,10 @@ MODEL = None
 TOKENIZER = None
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 USE_TRAINED_MODEL = False
-SBERT_MODEL = None
 LOAD_ERROR = ""      # why the trained model was not loaded (shown in the UI)
 LOADED_PATH = None
+PROJECT_DIR = Path(__file__).resolve().parent
+DEFAULT_CHECKPOINT = PROJECT_DIR / "models" / "judgebert_xlmr" / "best_model.pt"
 
 
 # ----------------------------------------------------------------------------
@@ -89,82 +89,70 @@ def validate_language_pair(original, simplified, selected_language):
 # Model loading / prediction (unchanged logic)
 # ----------------------------------------------------------------------------
 def try_load_trained_model():
+    """Load the fine-tuned LMP checkpoint; never substitute generic similarity."""
     global MODEL, TOKENIZER, USE_TRAINED_MODEL, LOAD_ERROR, LOADED_PATH
 
-    ckpt_paths = [
-        Path("models/judgebert_xlmr/best_model.pt"),
-    ]
+    MODEL = None
+    TOKENIZER = None
+    USE_TRAINED_MODEL = False
+    LOADED_PATH = None
+
+    configured_path = os.environ.get("PLX_CHECKPOINT_PATH", "").strip()
+    ckpt_path = Path(configured_path).expanduser() if configured_path else DEFAULT_CHECKPOINT
+    if not ckpt_path.is_absolute():
+        ckpt_path = PROJECT_DIR / ckpt_path
+    ckpt_path = ckpt_path.resolve()
+
+    if not ckpt_path.is_file():
+        LOAD_ERROR = (
+            f"Trained LMP checkpoint not found at {ckpt_path}. "
+            "Set PLX_CHECKPOINT_PATH or place best_model.pt in "
+            "models/judgebert_xlmr/."
+        )
+        print(f"[PreserveLex] {LOAD_ERROR}")
+        return False
 
     try:
         from src.model import JudgeBERTRegressor, get_tokenizer
 
-        ckpt_path = next((p for p in ckpt_paths if p.is_file()), None)
-        if ckpt_path is None:
-            LOAD_ERROR = (
-                "Checkpoint not found. Expected "
-                "models/judgebert_xlmr/best_model.pt"
-            )
-            return False
-
-        try:
-            ckpt = torch.load(
-                ckpt_path, map_location=DEVICE, weights_only=True
-            )
-        except Exception:
-            ckpt = torch.load(
-                ckpt_path, map_location=DEVICE, weights_only=False
-            )
-
-        if not isinstance(ckpt, dict) or "model_state_dict" not in ckpt:
-            raise ValueError(
-                "Checkpoint does not contain a 'model_state_dict' entry."
-            )
+        # Load tensor weights only. Do not fall back to unrestricted pickle loading.
+        ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=True)
+        if not isinstance(ckpt, dict) or not isinstance(ckpt.get("model_state_dict"), dict):
+            raise ValueError("Checkpoint must contain a model_state_dict mapping.")
 
         model_name = ckpt.get("model_name", "xlm-roberta-base")
-        TOKENIZER = get_tokenizer(model_name)
-        MODEL = JudgeBERTRegressor(model_name=model_name).to(DEVICE)
-        MODEL.load_state_dict(ckpt["model_state_dict"], strict=True)
-        MODEL.eval()
+        tokenizer = get_tokenizer(model_name)
+        model = JudgeBERTRegressor(model_name=model_name)
+        model.load_state_dict(ckpt["model_state_dict"], strict=True)
+        model.to(DEVICE)
+        model.eval()
 
+        TOKENIZER = tokenizer
+        MODEL = model
         USE_TRAINED_MODEL = True
         LOADED_PATH = str(ckpt_path)
         LOAD_ERROR = ""
-        print(f"[PreserveLex] Loaded trained model from {ckpt_path}")
+        print(f"[PreserveLex] Loaded trained LMP model from {ckpt_path} on {DEVICE}")
         return True
 
-    except Exception as e:
+    except Exception as exc:
         MODEL = None
         TOKENIZER = None
         USE_TRAINED_MODEL = False
         LOADED_PATH = None
-        LOAD_ERROR = f"{type(e).__name__}: {e}"
-        print(f"[PreserveLex] Trained model loading failed: {LOAD_ERROR}")
+        LOAD_ERROR = f"{type(exc).__name__}: {exc}"
+        print(f"[PreserveLex] Trained LMP model unavailable: {LOAD_ERROR}")
         return False
 
 
 def model_status_html():
     if USE_TRAINED_MODEL:
         return ('<div class="plx-model plx-model-ok"><span class="plx-dot"></span>'
-                f'Model: fine-tuned XLM-RoBERTa ({_html.escape(Path(LOADED_PATH).name)})</div>')
+                f'Trained LMP model loaded: {_html.escape(Path(LOADED_PATH).name)}</div>')
     reason = _html.escape(LOAD_ERROR or "trained model not loaded")
     return ('<div class="plx-model plx-model-warn"><span class="plx-dot"></span>'
-            f'Fallback: SBERT similarity only. Trained model not loaded: {reason}</div>')
+            f'LMP scoring disabled — trained model unavailable: {reason}</div>')
 
-
-def load_sbert():
-    global SBERT_MODEL
-    if SBERT_MODEL is None:
-        from sentence_transformers import SentenceTransformer
-        SBERT_MODEL = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
-    return SBERT_MODEL
-
-
-def predict_sbert(original, simplified):
-    model = load_sbert()
-    emb = model.encode([original, simplified], convert_to_numpy=True)
-    cos = float(np.dot(emb[0], emb[1]) / (np.linalg.norm(emb[0]) * np.linalg.norm(emb[1]) + 1e-8))
-    score = 1.0 + 9.0 * max(0.0, min(1.0, (cos - 0.3) / 0.7))
-    return round(score, 2)
 
 
 def predict_trained(original, simplified):
@@ -437,16 +425,23 @@ def predict_lmp(original, simplified, language, session):
         yield error_html, None, None
         return
 
+    if not USE_TRAINED_MODEL or MODEL is None or TOKENIZER is None:
+        reason = _html.escape(LOAD_ERROR or "The trained LMP checkpoint is not loaded.")
+        unavailable_html = (
+            '<div class="plx-card plx-empty">'
+            '<p class="plx-empty-title">Trained LMP model unavailable</p>'
+            '<p class="plx-empty-sub">No LMP score has been generated. '
+            'A generic semantic-similarity score is not a substitute for legal meaning preservation.</p>'
+            f'<p class="plx-empty-sub">{reason}</p>'
+            '</div>'
+        )
+        yield unavailable_html, None, None
+        return
+
     yield LOADING_HTML, None, None
     started = time.time()
-
-    if USE_TRAINED_MODEL:
-        score = predict_trained(original, simplified)
-        method = "Fine-tuned XLM-RoBERTa"
-    else:
-        score = predict_sbert(original, simplified)
-        method = "Multilingual SBERT (fallback)"
-
+    score = predict_trained(original, simplified)
+    method = "Fine-tuned XLM-RoBERTa"
     elapsed = time.time() - started
     if elapsed < 0.6:
         time.sleep(0.6 - elapsed)
@@ -1082,10 +1077,10 @@ CUSTOM_JS = """
 
 
 def build_demo():
-    print("[PreserveLex] LANGUAGE_VALIDATION_BUILD=2026-11-26-ACTIVE")
+    print("[PreserveLex] MODEL_LOADING_BUILD=2026-11-26-FAIL-CLOSED")
     try_load_trained_model()
-    print("[PreserveLex] " + (f"Using fine-tuned model: {LOADED_PATH}" if USE_TRAINED_MODEL
-                              else f"Using SBERT fallback. Reason: {LOAD_ERROR}"))
+    print("[PreserveLex] " + (f"Scoring enabled with trained model: {LOADED_PATH}" if USE_TRAINED_MODEL
+                              else f"LMP scoring disabled. Reason: {LOAD_ERROR}"))
     init_users()
 
     with gr.Blocks(
@@ -1141,7 +1136,7 @@ def build_demo():
         with gr.Column(visible=False, elem_classes="plx-app") as app_view:
             with gr.Row():
                 user_badge = gr.HTML()
-                #gr.HTML(model_status_html())
+                gr.HTML(model_status_html())
                 logout_btn = gr.Button("Sign out", size="sm", scale=0, min_width=110,
                                        elem_classes=["plx-btn", "plx-ghost"])
 
