@@ -481,12 +481,12 @@ LOCKED_HTML = """
 def predict_lmp(original, simplified, language, session):
     # Authentication
     if not session or not session.get("user"):
-        yield LOCKED_HTML, None, None
+        yield LOCKED_HTML, None, None, render_history(None)
         return
 
     # Required fields
     if not original or not original.strip() or not simplified or not simplified.strip():
-        yield WARN_HTML, None, None
+        yield WARN_HTML, None, None, render_history(session["user"])
         return
 
     # Validate both actual input languages BEFORE running either model.
@@ -498,7 +498,7 @@ def predict_lmp(original, simplified, language, session):
             f'<p class="plx-empty-sub">{_html.escape(language_error)}</p>'
             '</div>'
         )
-        yield error_html, None, None
+        yield error_html, None, None, render_history(session["user"])
         return
 
     if not USE_TRAINED_MODEL or MODEL is None or TOKENIZER is None:
@@ -511,10 +511,10 @@ def predict_lmp(original, simplified, language, session):
             f'<p class="plx-empty-sub">{reason}</p>'
             '</div>'
         )
-        yield unavailable_html, None, None
+        yield unavailable_html, None, None, render_history(session["user"])
         return
 
-    yield LOADING_HTML, None, None
+    yield LOADING_HTML, None, None, render_history(session["user"])
     started = time.time()
     score = predict_trained(original, simplified)
     method = "Fine-tuned XLM-RoBERTa"
