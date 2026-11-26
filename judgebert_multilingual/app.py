@@ -368,6 +368,7 @@ def result_html(score, decision, tone, blurb, language, method, findings=None):
 <div class="plx-card plx-result plx-{tone}" role="status">
     <div class="plx-top">
         <div class="plx-gauge" style="--off:{offset:.2f}">
+            <span class="plx-orbit" aria-hidden="true"><span class="plx-orbit-dot"></span></span>
             <svg viewBox="0 0 120 120" aria-hidden="true">
                 <circle class="plx-ring-bg" cx="60" cy="60" r="54"/>
                 <circle class="plx-ring" cx="60" cy="60" r="54" transform="rotate(-90 60 60)"/>
@@ -835,8 +836,22 @@ button.plx-ghost .plx-ripple { background: rgba(47, 75, 255, .2); }
 .plx-result { border-color: color-mix(in srgb, var(--accent) 35%, #2c3d5c); }
 
 .plx-top { display: grid; grid-template-columns: 132px 1fr; gap: 1.3rem; align-items: center; margin-bottom: 1.5rem; }
-.plx-gauge { position: relative; width: 132px; height: 132px; }
-.plx-gauge svg { width: 100%; height: 100%; }
+.plx-gauge { position: relative; width: 132px; height: 132px; isolation:isolate; }
+.plx-gauge svg { position:relative; z-index:1; width: 100%; height: 100%; }
+.plx-orbit {
+    position:absolute; z-index:0; inset:-9px; border:1px dashed rgba(148,163,184,.38);
+    border-radius:50%; animation:plx-orbit-spin 12s linear infinite; pointer-events:none;
+}
+.plx-orbit::before {
+    content:""; position:absolute; inset:8px; border:1px solid rgba(148,163,184,.12);
+    border-radius:50%;
+}
+.plx-orbit-dot {
+    position:absolute; top:9px; left:50%; width:10px; height:10px; margin-left:-5px;
+    border-radius:50%; background:var(--accent); border:2px solid #101d31;
+    box-shadow:0 0 12px color-mix(in srgb,var(--accent) 75%,transparent);
+}
+@keyframes plx-orbit-spin { to { transform:rotate(360deg); } }
 .plx-ring-bg { fill: none; stroke: #263756; stroke-width: 9; }
 .plx-ring {
     fill: none; stroke: var(--accent); stroke-width: 9; stroke-linecap: round;
