@@ -33,7 +33,7 @@ Legal text simplification must preserve legally critical elements: obligations, 
 |---|---|---|
 | 334 generated English/Hindi pairs | Synthetic; simulated labels | Development/debugging only; not human gold labels |
 | 10 English insurance pilot clauses | Pilot material; human validation pending | Annotation pilot only |
-| ASSET English simplification ratings | External CC BY-NC 4.0 general-domain pairs with human meaning ratings (0–100); importer committed, local download pending | Auxiliary general-domain benchmark only; not legal LMP labels |
+| ASSET English simplification ratings | External CC BY-SA 4.0 general-domain pairs with human meaning ratings (0–100); importer committed, local download pending | Auxiliary general-domain benchmark only; not legal LMP labels |
 | legalTransEn_Indic English-Hindi corpus | External MIT-licensed legal translation pairs; local import must be run | Auxiliary multilingual legal-domain analysis; not LMP regression labels |
 | Independent human-rated simplification pairs | Pending | Required before claiming validated LMP supervision |
 
