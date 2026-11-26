@@ -1279,7 +1279,6 @@ def build_demo():
         with gr.Column(visible=False, elem_classes="plx-app") as app_view:
             with gr.Row():
                 user_badge = gr.HTML()
-                gr.HTML(model_status_html())
                 logout_btn = gr.Button("Sign out", size="sm", scale=0, min_width=110,
                                        elem_classes=["plx-btn", "plx-ghost"])
 
