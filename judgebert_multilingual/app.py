@@ -368,7 +368,7 @@ def result_html(score, decision, tone, blurb, language, method, findings=None):
 <div class="plx-card plx-result plx-{tone}" role="status">
     <div class="plx-top">
         <div class="plx-gauge" style="--off:{offset:.2f}">
-            <span class="plx-orbit" aria-hidden="true"><span class="plx-orbit-dot"></span></span>
+            <span class="plx-orbit" aria-hidden="true"><span class="plx-orbit-track plx-orbit-track-a"></span><span class="plx-orbit-track plx-orbit-track-b"></span><span class="plx-orbit-satellite"><span class="plx-orbit-dot"></span></span></span>
             <svg viewBox="0 0 120 120" aria-hidden="true">
                 <circle class="plx-ring-bg" cx="60" cy="60" r="54"/>
                 <circle class="plx-ring" cx="60" cy="60" r="54" transform="rotate(-90 60 60)"/>
@@ -839,19 +839,37 @@ button.plx-ghost .plx-ripple { background: rgba(47, 75, 255, .2); }
 .plx-gauge { position: relative; width: 132px; height: 132px; isolation:isolate; }
 .plx-gauge svg { position:relative; z-index:1; width: 100%; height: 100%; }
 .plx-orbit {
-    position:absolute; z-index:0; inset:-9px; border:1px dashed rgba(148,163,184,.38);
-    border-radius:50%; animation:plx-orbit-spin 12s linear infinite; pointer-events:none;
+    position:absolute; z-index:2; inset:-23px -17px; pointer-events:none;
+    perspective:420px; transform-style:preserve-3d;
 }
-.plx-orbit::before {
-    content:""; position:absolute; inset:8px; border:1px solid rgba(148,163,184,.12);
-    border-radius:50%;
+.plx-orbit-track {
+    position:absolute; inset:8px 0; border:1.5px solid rgba(30,224,178,.78);
+    border-radius:50%; transform-style:preserve-3d;
+    box-shadow:0 0 9px rgba(22,213,174,.18), inset 0 0 9px rgba(22,213,174,.10);
+}
+.plx-orbit-track-a {
+    transform:rotateX(67deg) rotateZ(-18deg);
+    animation:plx-orbit-turn-a 9s linear infinite;
+}
+.plx-orbit-track-b {
+    inset:15px -5px; border-color:rgba(37,170,218,.38);
+    transform:rotateY(63deg) rotateZ(24deg);
+    animation:plx-orbit-turn-b 13s linear infinite reverse;
+}
+.plx-orbit-satellite {
+    position:absolute; inset:0; transform:rotateX(67deg);
+    animation:plx-orbit-turn-a 9s linear infinite;
 }
 .plx-orbit-dot {
-    position:absolute; top:9px; left:50%; width:10px; height:10px; margin-left:-5px;
-    border-radius:50%; background:var(--accent); border:2px solid #101d31;
-    box-shadow:0 0 12px color-mix(in srgb,var(--accent) 75%,transparent);
+    position:absolute; top:4px; left:50%; width:11px; height:11px; margin-left:-5.5px;
+    border-radius:50%; background:#54ffd0; border:2px solid #d7fff5;
+    box-shadow:0 0 8px #39f5c4,0 0 20px rgba(32,238,190,.9),0 0 32px rgba(32,238,190,.45);
 }
-@keyframes plx-orbit-spin { to { transform:rotate(360deg); } }
+@keyframes plx-orbit-turn-a { to { transform:rotateX(67deg) rotateZ(342deg); } }
+@keyframes plx-orbit-turn-b { to { transform:rotateY(63deg) rotateZ(384deg); } }
+@media (prefers-reduced-motion:reduce) {
+    .plx-orbit-track-a,.plx-orbit-track-b,.plx-orbit-satellite { animation:none !important; }
+}
 .plx-ring-bg { fill: none; stroke: #263756; stroke-width: 9; }
 .plx-ring {
     fill: none; stroke: var(--accent); stroke-width: 9; stroke-linecap: round;
