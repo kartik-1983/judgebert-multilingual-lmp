@@ -5,7 +5,7 @@
 - Dataset: ASSET (Alva-Manchego et al., ACL 2020)
 - Hugging Face dataset: https://huggingface.co/datasets/facebook/asset
 - Official repository: https://github.com/facebookresearch/asset
-- License: Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0), as stated by the Hugging Face dataset card and the official repository LICENSE.
+- License: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0), as stated by the Hugging Face dataset card and the official repository LICENSE.
 - Citation: Alva-Manchego, F., Martin, L., Bordes, A., Scarton, C., Sagot, B., & Specia, L. (2020). ASSET: A Dataset for Tuning and Evaluation of Sentence Simplification Models with Multiple Rewriting Transformations. Proceedings of ACL 2020.
 
 ## What it contains
@@ -36,7 +36,7 @@ Outputs:
 
 ## License compliance
 
-Use for non-commercial academic research only under CC BY-NC 4.0. Preserve attribution and the license notice. Review the full license and dataset card before redistributing any derived dataset. This note is not legal advice.
+The current Hugging Face dataset card identifies CC BY-SA 4.0. Preserve attribution and comply with the share-alike terms when distributing adaptations. Review the full license and source materials before redistribution. This note is not legal advice.
 
 ## Citation
 
