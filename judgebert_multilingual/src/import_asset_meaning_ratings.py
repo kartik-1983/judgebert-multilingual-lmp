@@ -14,7 +14,7 @@ from datasets import load_dataset
 DATASET_ID = "facebook/asset"
 DATASET_URL = "https://huggingface.co/datasets/facebook/asset"
 REPOSITORY_URL = "https://github.com/facebookresearch/asset"
-LICENSE = "CC BY-NC 4.0"
+LICENSE = "CC BY-SA 4.0"
 CITATION = (
     "Alva-Manchego, F., Martin, L., Bordes, A., Scarton, C., Sagot, B., "
     "& Specia, L. (2020). ASSET: A Dataset for Tuning and Evaluation of "
@@ -35,11 +35,22 @@ def main():
         dataset = dataset.select(range(min(args.max_rows, len(dataset))))
 
     df = dataset.to_pandas()
-    # Hugging Face class labels may be decoded to strings or integer IDs.
-    aspect_map = {0: "meaning", 1: "fluency", 2: "simplicity"}
-    if len(df) and isinstance(df.iloc[0]["aspect"], int):
-        df["aspect"] = df["aspect"].map(aspect_map)
-    df = df[df["aspect"].astype(str).str.lower().eq("meaning")].copy()
+    # ClassLabel values can appear as strings, Python ints, or NumPy ints
+    # after conversion to pandas. Decode using the dataset feature schema.
+    aspect_feature = dataset.features["aspect"]
+    def decode_aspect(value):
+        if pd.isna(value):
+            return ""
+        if isinstance(value, str) and not value.strip().isdigit():
+            return value.strip().lower()
+        try:
+            return aspect_feature.int2str(int(value)).strip().lower()
+        except (ValueError, TypeError, AttributeError):
+            return str(value).strip().lower()
+
+    df["aspect"] = df["aspect"].map(decode_aspect)
+    print("ASSET aspect counts:", df["aspect"].value_counts(dropna=False).to_dict())
+    df = df[df["aspect"].eq("meaning")].copy()
     if df.empty:
         raise RuntimeError("No meaning-rating rows found in ASSET ratings config.")
 
@@ -92,7 +103,7 @@ def main():
         "not_legal_lmp": True,
         "not_converted_to_project_1_to_10_scale": True,
         "citation": CITATION,
-        "use_restriction": "NonCommercial; comply with CC BY-NC 4.0 attribution terms.",
+        "use_restriction": "Comply with CC BY-SA 4.0 attribution and share-alike terms.",
         "note": "Use as an auxiliary external benchmark only; do not merge into legal LMP regression labels."
     }
     meta_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
