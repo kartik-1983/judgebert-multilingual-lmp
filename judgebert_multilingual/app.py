@@ -11,6 +11,7 @@ import re
 import secrets
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import gradio as gr
@@ -169,7 +170,9 @@ def predict_trained(original, simplified):
 # ----------------------------------------------------------------------------
 # Authentication (accounts stored as salted PBKDF2 hashes in users.json)
 # ----------------------------------------------------------------------------
-USERS_FILE = Path(os.environ.get("PLX_USERS_FILE", "users.json"))
+USERS_FILE = Path(os.environ.get("PLX_USERS_FILE", str(PROJECT_DIR / "users.json")))
+HISTORY_FILE = Path(os.environ.get("PLX_HISTORY_FILE", str(PROJECT_DIR / "history.json")))
+_HISTORY_LOCK = threading.Lock()
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
 MIN_PASSWORD = 8
 MAX_FAILS = 5        # failed sign-ins allowed ...
@@ -196,6 +199,71 @@ def _save_users(users):
     tmp = USERS_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(users, indent=2), encoding="utf-8")
     tmp.replace(USERS_FILE)
+
+def _load_history():
+    try:
+        data = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_history_entry(username, entry):
+    """Persist a completed evaluation under the signed-in username."""
+    key = (username or "").strip().lower()
+    if not key:
+        return
+    with _HISTORY_LOCK:
+        history = _load_history()
+        history.setdefault(key, []).insert(0, entry)
+        tmp = HISTORY_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(HISTORY_FILE)
+
+
+def render_history(username):
+    """Render the signed-in user's saved evaluations only."""
+    key = (username or "").strip().lower()
+    entries = _load_history().get(key, [])
+    if not entries:
+        return ('<div class="plx-card plx-empty"><p class="plx-empty-title">No history yet</p>'
+                '<p class="plx-empty-sub">Completed evaluations will appear here automatically.</p></div>')
+    cards = []
+    for item in entries:
+        esc = _html.escape
+        stamp = esc(item.get("timestamp", ""))
+        score = esc(str(item.get("score", "—")))
+        decision = esc(item.get("decision", ""))
+        language = esc(item.get("language", ""))
+        original = esc(item.get("original", ""))
+        simplified = esc(item.get("simplified", ""))
+        findings = item.get("findings", [])
+        finding_text = "; ".join(f"{f.get('kind', '')}: {f.get('detail', '')}" for f in findings) or "No potential changes detected by advisory checks."
+        cards.append(
+            '<article class="plx-history-card">'
+            f'<div class="plx-history-top"><span>{stamp}</span><b>{score}/10 · {decision}</b></div>'
+            f'<div class="plx-history-meta">{language}</div>'
+            f'<details><summary>View original and simplified text</summary>'
+            f'<p><strong>Original</strong><br>{original}</p>'
+            f'<p><strong>Simplified</strong><br>{simplified}</p></details>'
+            f'<p class="plx-history-findings">{esc(finding_text)}</p>'
+            '</article>'
+        )
+    return '<div class="plx-history-list">' + "".join(cards) + '</div>'
+
+
+def clear_user_history(username):
+    key = (username or "").strip().lower()
+    if not key:
+        return render_history(username), "Please sign in to manage history."
+    with _HISTORY_LOCK:
+        history = _load_history()
+        history[key] = []
+        tmp = HISTORY_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(HISTORY_FILE)
+    return render_history(username), "Your evaluation history has been cleared."
+
 
 
 def _add_user(username, password):
@@ -469,7 +537,18 @@ def predict_lmp(original, simplified, language, session):
         decision, tone = "Not preserved", "bad"
         blurb = "The model predicts a substantial difference. Review the original clause before use."
 
-    yield result_html(score, decision, tone, blurb, language, method, findings), score, decision
+    history_entry = {
+        "timestamp": datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "language": str(language),
+        "original": original.strip(),
+        "simplified": simplified.strip(),
+        "score": score,
+        "decision": decision,
+        "findings": findings,
+        "model": method,
+    }
+    save_history_entry(session["user"], history_entry)
+    yield result_html(score, decision, tone, blurb, language, method, findings), score, decision, render_history(session["user"])
 
 
 def clear_all():
@@ -1101,6 +1180,15 @@ body::after  { right: 0; border-left: 1px solid;  border-image: linear-gradient(
 .plx-model-warn { border-color: #f0cf84; background: #fff8e6; color: #7a5200; }
 .plx-model-warn .plx-dot { background: var(--mid); box-shadow: 0 0 0 3px rgba(232, 169, 18, .25); }
 
+.plx-history-list { display:grid; gap:.8rem; }
+.plx-history-card { padding:1rem 1.1rem; background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:0 8px 20px -18px rgba(15,27,45,.35); }
+.plx-history-top { display:flex; justify-content:space-between; align-items:center; gap:.8rem; flex-wrap:wrap; color:var(--ink-2); font-size:.84rem; }
+.plx-history-top b { color:var(--seal); }
+.plx-history-meta { margin:.35rem 0; color:var(--muted); font-size:.8rem; }
+.plx-history-card details { margin-top:.55rem; color:var(--ink-2); font-size:.86rem; }
+.plx-history-card summary { cursor:pointer; color:var(--seal); font-weight:600; }
+.plx-history-card details p { overflow-wrap:anywhere; line-height:1.5; }
+.plx-history-findings { margin:.65rem 0 0; padding:.65rem .8rem; border-radius:9px; background:rgba(47,75,255,.06); color:var(--ink-2); font-size:.84rem; line-height:1.5; }
 .plx-footer { text-align: center; padding: 1.6rem 0 .5rem; font-size: .8rem; color: #8592a8; }
 
 @media (max-width: 640px) {
@@ -1277,6 +1365,14 @@ def build_demo():
                                 )
                             lib_html = gr.HTML(value=render_library("India", "", ALL_CATEGORIES))
 
+                        with gr.Tab("History"):
+                            gr.HTML('<p class="plx-count">Your completed evaluations, saved privately to your PreserveLex account on this server.</p>')
+                            with gr.Row():
+                                history_refresh = gr.Button("Refresh history", size="sm", elem_classes=["plx-btn", "plx-ghost"])
+                                history_clear = gr.Button("Clear my history", size="sm", elem_classes=["plx-btn", "plx-ghost"])
+                            history_msg = gr.HTML()
+                            history_html = gr.HTML(value='<div class="plx-card plx-empty"><p class="plx-empty-title">Sign in to view history</p></div>')
+
                 with gr.Column(scale=2, min_width=205):
                     gr.HTML("""
                     <section class="plx-side-card">
@@ -1334,8 +1430,16 @@ def build_demo():
         btn.click(
             fn=predict_lmp,
             inputs=[original, simplified, language, session],
-            outputs=[result, score_num, decision],
+            outputs=[result, score_num, decision, history_html],
             show_progress="hidden",  # we render our own loading card
+        )
+        history_refresh.click(
+            fn=lambda state: render_history((state or {}).get("user")),
+            inputs=[session], outputs=[history_html], show_progress="hidden",
+        )
+        history_clear.click(
+            fn=lambda state: clear_user_history((state or {}).get("user")),
+            inputs=[session], outputs=[history_html, history_msg], show_progress="hidden",
         )
         # Clear stale results when either text or the selected language changes.
         for component in (original, simplified, language):
