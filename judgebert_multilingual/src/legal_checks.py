@@ -6,15 +6,15 @@ import re
 
 
 MODALS = {
-    "mandatory": re.compile(r"\\b(?:must|shall|required to|is required to|is obligated to|deberá|debe|muss|doit)\\b", re.I),
-    "discretionary": re.compile(r"\\b(?:may|might|can|could|is permitted to|is allowed to|podrá|puede|kann|peut)\\b", re.I),
-    "prohibitive": re.compile(r"\\b(?:must not|shall not|may not|cannot|prohibited|forbidden|no deberá|no debe|darf nicht|ne doit pas)\\b", re.I),
+    "mandatory": re.compile(r"\b(?:must|shall|required to|is required to|is obligated to|deberá|debe|muss|doit)\b", re.I),
+    "discretionary": re.compile(r"\b(?:may|might|can|could|is permitted to|is allowed to|podrá|puede|kann|peut)\b", re.I),
+    "prohibitive": re.compile(r"\b(?:must not|shall not|may not|cannot|prohibited|forbidden|no deberá|no debe|darf nicht|ne doit pas)\b", re.I),
 }
-CONDITION = re.compile(r"\\b(?:if|unless|except|provided that|subject to|only if|when|where|salvo|excepto|wenn|sauf|siempre que)\\b", re.I)
-SCOPE = re.compile(r"\\b(?:all|any|only|solely|each|every|none|each party|either party|both parties|todos?|únicamente|nur|tous|chaque)\\b", re.I)
-PARTIES = re.compile(r"\\b(?:tenant|landlord|buyer|seller|consumer|supplier|employee|employer|company|party|parties|applicant|authority|lessee|lessor)\\b", re.I)
-NUMERIC = re.compile(r"(?:₹|\\$|€|£|\\b(?:rs\\.?|inr|usd|eur|gbp)\\b)?\\s*\\d[\\d,]*(?:\\.\\d+)?\\s*(?:%|days?|weeks?|months?|years?|hours?|rupees?)?", re.I)
-DATE_WORDS = re.compile(r"\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b", re.I)
+CONDITION = re.compile(r"\b(?:if|unless|except|provided that|subject to|only if|when|where|salvo|excepto|wenn|sauf|siempre que)\b", re.I)
+SCOPE = re.compile(r"\b(?:all|any|only|solely|each|every|none|each party|either party|both parties|todos?|únicamente|nur|tous|chaque)\b", re.I)
+PARTIES = re.compile(r"\b(?:tenant|landlord|buyer|seller|consumer|supplier|employee|employer|company|party|parties|applicant|authority|lessee|lessor)\b", re.I)
+NUMERIC = re.compile(r"(?:₹|\$|€|£|\b(?:rs\.?|inr|usd|eur|gbp)\b)?\s*\d[\d,]*(?:\.\d+)?\s*(?:%|days?|weeks?|months?|years?|hours?|rupees?)?", re.I)
+DATE_WORDS = re.compile(r"\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", re.I)
 
 
 def _add(findings, kind, severity, detail):
@@ -47,7 +47,7 @@ def analyze_changes(original, simplified):
              "Permission-related modal wording differs. Check who is allowed or entitled to act.")
 
     # Negation.
-    neg = re.compile(r"\\b(?:not|no|never|neither|without|nunca|nicht|kein|ne|pas|aucun)\\b", re.I)
+    neg = re.compile(r"\b(?:not|no|never|neither|without|nunca|nicht|kein|ne|pas|aucun)\b", re.I)
     if bool(neg.search(original)) != bool(neg.search(simplified)):
         _add(findings, "Negation changed", "high",
              "Negation-related wording differs; check whether a prohibition or exclusion was reversed or removed.")
