@@ -1329,7 +1329,7 @@ if __name__ == "__main__":
     demo = build_demo()
     demo.queue().launch(
         server_name="127.0.0.1",
-        server_port=7860,
+        server_port=int(os.environ.get("GRADIO_SERVER_PORT", "7862")),
         share=False,
         show_error=True,
     )
