@@ -180,3 +180,29 @@ Only use a checkpoint produced for this repository's `JudgeBERTRegressor`
 architecture and matching tokenizer/base model. Do not load untrusted checkpoint
 files.
 
+
+
+## External internet-sourced legal dataset
+
+The project now includes an importer for the **Supreme Court and High Court Orders Parallel Corpus (English-Hindi)** from Hugging Face:
+
+- Dataset: https://huggingface.co/datasets/Wasserstoff-AI/legalTransEn_Indic
+- Dataset card reports approximately 89,951 aligned English-Hindi legal sentence pairs.
+- License shown on the dataset card: MIT.
+- Import script: `src/import_legal_parallel_corpus.py`
+- Documentation: `docs/external_legal_dataset.md`
+
+Run from this directory:
+
+```powershell
+pip install datasets pandas
+python src/import_legal_parallel_corpus.py
+```
+
+For a 100-row trial:
+
+```powershell
+python src/import_legal_parallel_corpus.py --max-rows 100
+```
+
+**Research-integrity limitation:** These are English-Hindi legal translation pairs, not original-versus-simplified pairs, and they have no LMP ratings. The importer saves them as an auxiliary multilingual legal corpus and creates a blank human-review sheet. It deliberately does not invent LMP labels or add them to the supervised LMP regression training set. The existing 334 synthetic pairs remain synthetic. A separate, properly licensed legal simplification dataset with human-validated LMP annotations is still needed for direct supervised LMP training and evaluation.
