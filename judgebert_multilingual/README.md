@@ -140,3 +140,43 @@ This educational project is released for academic use. When using the code or id
 - Research status and claim limits: `README_RESEARCH_STATUS.md`
 
 Do not present synthetic labels as human judgments, randomly assigned domains as domain generalization, or model superiority as established without a fair held-out comparison.
+
+## Running the PreserveLex application with the trained model
+
+The Gradio application entry point is `app.py`. Start it from the
+`judgebert_multilingual/` directory:
+
+```bash
+python app.py
+```
+
+The application loads the fine-tuned checkpoint from
+`models/judgebert_xlmr/best_model.pt` by default. The checkpoint is intentionally
+not stored in Git because of its size. If it is stored elsewhere, configure an
+absolute path before starting the application:
+
+PowerShell:
+
+```powershell
+$env:PLX_CHECKPOINT_PATH = "D:\\models\\best_model.pt"
+python app.py
+```
+
+Linux/macOS:
+
+```bash
+export PLX_CHECKPOINT_PATH="/path/to/best_model.pt"
+python app.py
+```
+
+**Scoring safety:** PreserveLex now fails closed if the fine-tuned checkpoint is
+missing, unreadable, or incompatible. It displays the reason and does not produce
+an LMP score or a Preserved/Partially preserved/Not preserved verdict. Generic
+SBERT cosine similarity is not used as a substitute for legal meaning-preservation
+prediction. The model-status message in the application shows whether the trained
+checkpoint loaded successfully.
+
+Only use a checkpoint produced for this repository's `JudgeBERTRegressor`
+architecture and matching tokenizer/base model. Do not load untrusted checkpoint
+files.
+
