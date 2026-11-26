@@ -13,7 +13,7 @@ Legal text simplification must preserve legally critical elements: obligations, 
 - Implements SBERT cosine similarity and BERTScore baselines.
 - Fine-tunes XLM-RoBERTa as a JUDGEBERT-inspired regression model.
 - Adds a legal error taxonomy and review checklist.
-- Provides a separate English-Hindi legal translation corpus importer for auxiliary multilingual analysis.
+- Provides separate English-Hindi legal translation and ASSET human-rated meaning-preservation benchmark importers.
 - Adds a two-reviewer plus adjudicator protocol for building an independently annotated LMP dataset.
 
 **Research Question:** How effectively can a JUDGEBERT-inspired model assess legal meaning preservation in English and Hindi, and how does it compare with generic semantic-similarity approaches on an independently annotated held-out set?
@@ -33,6 +33,7 @@ Legal text simplification must preserve legally critical elements: obligations, 
 |---|---|---|
 | 334 generated English/Hindi pairs | Synthetic; simulated labels | Development/debugging only; not human gold labels |
 | 10 English insurance pilot clauses | Pilot material; human validation pending | Annotation pilot only |
+| ASSET English simplification ratings | External CC BY-NC 4.0 general-domain pairs with human meaning ratings (0–100); importer committed, local download pending | Auxiliary general-domain benchmark only; not legal LMP labels |
 | legalTransEn_Indic English-Hindi corpus | External MIT-licensed legal translation pairs; local import must be run | Auxiliary multilingual legal-domain analysis; not LMP regression labels |
 | Independent human-rated simplification pairs | Pending | Required before claiming validated LMP supervision |
 
@@ -73,6 +74,17 @@ python src/explain.py
 ```
 
 The training command above reflects the existing development workflow. For research claims, train/evaluate only with clearly identified data splits and do not mix synthetic labels into the human-annotated benchmark.
+
+## ASSET Human Meaning-Preservation Benchmark
+
+ASSET provides crowd-worker meaning ratings on a native 0–100 scale. It is general-domain English simplification, not legal text. Import it separately:
+
+```powershell
+pip install datasets pandas
+python src/import_asset_meaning_ratings.py --max-rows 100
+```
+
+Remove `--max-rows 100` for the full ratings split. See `docs/ASSET_EXTERNAL_BENCHMARK.md`. Do not convert these scores into legal LMP 1–10 labels or merge them into the legal training set.
 
 ## Auxiliary English-Hindi Legal Corpus
 
