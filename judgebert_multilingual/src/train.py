@@ -182,20 +182,40 @@ def main(args):
     print(f"Args: {vars(args)}")
 
     df = load_dataset(args.data)
+    provenance = (
+        set(df["label_provenance"].dropna().astype(str).str.lower())
+        if "label_provenance" in df.columns else set()
+    )
+    is_synthetic = any("synthetic" in value or "simulated" in value for value in provenance)
+    if is_synthetic and not args.allow_synthetic_training:
+        raise SystemExit(
+            "Dataset provenance marks these labels as synthetic/simulated. "
+            "Pass --allow-synthetic-training only for exploratory development; "
+            "do not use resulting metrics as human-validated research evidence."
+        )
     print(f"Loaded {len(df)} pairs")
+    if is_synthetic:
+        print("WARNING: TRAINING ON SYNTHETIC LABELS — exploratory development only.")
 
     # Group by source clause so variants of the same original cannot leak across
     # train/validation/test. Split BEFORE augmentation; synthetic sanity examples
     # are added to training only.
-    groups = df["language"].astype(str) + "::" + df["original"].astype(str).str.strip()
+    groups = (
+        df["split_group"].astype(str)
+        if "split_group" in df.columns
+        else df["language"].astype(str) + "::" + df["original"].astype(str).str.strip()
+    )
     first = GroupShuffleSplit(n_splits=1, test_size=0.30, random_state=args.seed)
     train_idx, temp_idx = next(first.split(df, groups=groups))
     train_df = df.iloc[train_idx].copy()
     temp_df = df.iloc[temp_idx].copy()
     second = GroupShuffleSplit(n_splits=1, test_size=0.50, random_state=args.seed + 1)
-    val_rel, test_rel = next(second.split(temp_df, groups=(
-        temp_df["language"].astype(str) + "::" + temp_df["original"].astype(str).str.strip()
-    )))
+    temp_groups = (
+        temp_df["split_group"].astype(str)
+        if "split_group" in temp_df.columns
+        else temp_df["language"].astype(str) + "::" + temp_df["original"].astype(str).str.strip()
+    )
+    val_rel, test_rel = next(second.split(temp_df, groups=temp_groups))
     val_df = temp_df.iloc[val_rel].copy()
     test_df = temp_df.iloc[test_rel].copy()
 
@@ -328,6 +348,11 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fine-tune JUDGEBERT-style LMP model")
     parser.add_argument("--data", default="data/lmp_dataset.jsonl")
+    parser.add_argument(
+        "--allow-synthetic-training",
+        action="store_true",
+        help="Explicitly allow training on synthetic/simulated labels for development only.",
+    )
     parser.add_argument("--model_name", default="xlm-roberta-base",
                         help="Base model (xlm-roberta-base, microsoft/mdeberta-v3-base, etc.)")
     parser.add_argument("--epochs", type=int, default=8)
