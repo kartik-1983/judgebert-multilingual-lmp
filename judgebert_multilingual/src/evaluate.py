@@ -106,9 +106,9 @@ def main(args):
         "n": int(len(df)),
         "metrics_against_dataset_labels": metrics,
         "warning": (
-            "These metrics are not human-validated research evidence."
-            if evidence_type != "LABEL_PROVENANCE_REQUIRES_EXTERNAL_VERIFICATION"
-            else "Verify annotation provenance, adjudication and split integrity before publication."
+            "Synthetic-label smoke test only; do not report as human-validated performance."
+            if known_synthetic
+            else "User attested human labels. Independently audit annotation provenance, adjudication and split integrity before publication."
         ),
     }
 
