@@ -25,12 +25,23 @@ def compute_metrics(
     y_true: np.ndarray,
     y_pred: np.ndarray,
 ) -> Dict[str, float]:
-    """Compute standard regression metrics for LMP prediction."""
-    y_true = np.asarray(y_true, dtype=float)
-    y_pred = np.asarray(y_pred, dtype=float)
+    """Compute regression metrics with safe handling of tiny/constant samples."""
+    y_true = np.asarray(y_true, dtype=float).reshape(-1)
+    y_pred = np.asarray(y_pred, dtype=float).reshape(-1)
 
-    pearson_r, pearson_p = pearsonr(y_true, y_pred)
-    spearman_r, spearman_p = spearmanr(y_true, y_pred)
+    if len(y_true) != len(y_pred):
+        raise ValueError("y_true and y_pred must have the same length.")
+    if len(y_true) < 2:
+        raise ValueError("At least two paired observations are required.")
+    if not np.isfinite(y_true).all() or not np.isfinite(y_pred).all():
+        raise ValueError("Metric inputs must contain only finite numeric values.")
+
+    if np.unique(y_true).size < 2 or np.unique(y_pred).size < 2:
+        pearson_r = pearson_p = spearman_r = spearman_p = float("nan")
+    else:
+        pearson_r, pearson_p = pearsonr(y_true, y_pred)
+        spearman_r, spearman_p = spearmanr(y_true, y_pred)
+
     rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
     mae = float(mean_absolute_error(y_true, y_pred))
 
@@ -41,7 +52,7 @@ def compute_metrics(
         "spearman_p": float(spearman_p),
         "rmse": rmse,
         "mae": mae,
-        "n": len(y_true),
+        "n": int(len(y_true)),
     }
 
 
