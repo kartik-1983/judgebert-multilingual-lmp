@@ -2,11 +2,12 @@
 Baseline semantic similarity methods for Legal Meaning Preservation.
 
 Implements:
-1. Sentence-BERT cosine similarity (multilingual)
-2. BERTScore (F1)
+1. TF-IDF cosine similarity (lexical baseline)
+2. Sentence-BERT cosine similarity (multilingual)
+3. BERTScore (F1)
 
-These serve as generic semantic-similarity baselines against which the
-JUDGEBERT-inspired model is compared.
+These serve as generic semantic-similarity and lexical baselines against which the
+JUDGEBERT-inspired / PreserveLex model is compared.
 """
 
 import argparse
@@ -16,11 +17,44 @@ from typing import List, Dict
 import numpy as np
 import pandas as pd
 import torch
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer, util
 from bert_score import score as bert_score
 from tqdm import tqdm
 
 from utils import load_dataset, compute_metrics, print_metrics, save_results, decision_from_score
+
+
+def run_tfidf(
+    originals: List[str],
+    simplifieds: List[str],
+    ngram_range: tuple = (1, 2),
+) -> np.ndarray:
+    """Compute TF-IDF cosine similarity and scale to [1, 10].
+
+    This is a simple lexical overlap baseline. It often performs well on
+    general-domain text where surface form is informative, but is expected
+    to be weaker than a supervised legal LMP model on obligation / condition
+    / exception changes.
+    """
+    print("Computing TF-IDF cosine similarity baseline...")
+    vectorizer = TfidfVectorizer(ngram_range=ngram_range, min_df=1, sublinear_tf=True)
+    # Fit on the union of originals and simplifieds
+    all_texts = list(originals) + list(simplifieds)
+    vectorizer.fit(all_texts)
+
+    orig_vecs = vectorizer.transform(originals)
+    simp_vecs = vectorizer.transform(simplifieds)
+
+    # Pairwise cosine for corresponding pairs
+    cos_sims = np.array([
+        cosine_similarity(orig_vecs[i], simp_vecs[i])[0, 0]
+        for i in range(len(originals))
+    ])
+    # Cosine is in [0, 1] for non-negative TF-IDF → map to [1, 10]
+    scores = 1.0 + 9.0 * cos_sims
+    return scores.astype(float)
 
 
 def run_sbert(
@@ -74,29 +108,39 @@ def evaluate_baselines(
     data_path: str = "data/lmp_dataset.jsonl",
     output_dir: str = "results",
 ) -> Dict:
-    """Run both baselines and compute metrics overall and by language."""
+    """Run TF-IDF, SBERT and BERTScore baselines and compute metrics."""
     df = load_dataset(data_path)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     results = {"overall": {}, "by_language": {}}
 
+    originals = df["original"].tolist()
+    simplifieds = df["simplified"].tolist()
+
+    # ---- TF-IDF (lexical baseline) ----
+    print("\n>>> Running TF-IDF baseline...")
+    tfidf_scores = run_tfidf(originals, simplifieds)
+    df["tfidf_score"] = tfidf_scores
+    df["tfidf_decision"] = [decision_from_score(s) for s in tfidf_scores]
+    metrics_tfidf = compute_metrics(df["lmp_score"].values, tfidf_scores)
+    print_metrics(metrics_tfidf, "TF-IDF vs Human LMP (Overall)")
+    results["overall"]["tfidf"] = metrics_tfidf
+
     # ---- SBERT ----
     print("\n>>> Running SBERT baseline...")
-    sbert_scores = run_sbert(df["original"].tolist(), df["simplified"].tolist())
+    sbert_scores = run_sbert(originals, simplifieds)
     df["sbert_score"] = sbert_scores
     df["sbert_decision"] = [decision_from_score(s) for s in sbert_scores]
-
     metrics_sbert = compute_metrics(df["lmp_score"].values, sbert_scores)
     print_metrics(metrics_sbert, "SBERT vs Human LMP (Overall)")
     results["overall"]["sbert"] = metrics_sbert
 
-    # ---- BERTScore (approximate; run on English primarily for speed) ----
+    # ---- BERTScore ----
     print("\n>>> Running BERTScore baseline (may take time)...")
-    # For mixed language we still use a multilingual model
     try:
         bs_scores = run_bertscore(
-            df["original"].tolist(),
-            df["simplified"].tolist(),
+            originals,
+            simplifieds,
             model_type="xlm-roberta-base",
         )
         df["bertscore"] = bs_scores
@@ -108,14 +152,21 @@ def evaluate_baselines(
         df["bertscore"] = np.nan
         results["overall"]["bertscore"] = {"error": str(e)}
 
-    # Per-language breakdown for SBERT
+    # Per-language breakdown
     for lang in ["en", "hi"]:
         mask = df["language"] == lang
         if mask.sum() == 0:
             continue
-        m = compute_metrics(df.loc[mask, "lmp_score"].values, df.loc[mask, "sbert_score"].values)
-        print_metrics(m, f"SBERT – Language = {lang.upper()}")
-        results["by_language"][lang] = {"sbert": m}
+        lang_results = {}
+        for col, name in [("tfidf_score", "tfidf"), ("sbert_score", "sbert")]:
+            if col in df.columns:
+                m = compute_metrics(
+                    df.loc[mask, "lmp_score"].values,
+                    df.loc[mask, col].values,
+                )
+                print_metrics(m, f"{name.upper()} – Language = {lang.upper()}")
+                lang_results[name] = m
+        results["by_language"][lang] = lang_results
 
     # Save predictions
     pred_path = Path(output_dir) / "baseline_predictions.csv"
