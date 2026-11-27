@@ -1,159 +1,130 @@
 """
-Full evaluation suite:
-- Load trained model or use baselines
-- Pearson / RMSE / MAE / Spearman
-- Per-language analysis
-- Sanity checks (identical & unrelated pairs)
-"""
+Research-safe evaluation for the JUDGEBERT-inspired LMP regressor.
 
+This script never substitutes SBERT for the trained regression model.
+By default it refuses to compute supervised metrics on the repository's
+known synthetic/template-generated dataset. Use --allow-simulated-label-metrics
+only for a clearly labelled pipeline smoke test, never as research evidence.
+"""
 import argparse
 from pathlib import Path
-from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from model import JudgeBERTRegressor, get_tokenizer
 from utils import load_dataset, compute_metrics, print_metrics, save_results, decision_from_score
 from train import LMPDataset
+from torch.utils.data import DataLoader
 
 
 @torch.no_grad()
-def predict_with_model(
-    model,
-    tokenizer,
-    originals: List[str],
-    simplifieds: List[str],
-    device: torch.device,
-    batch_size: int = 16,
-    max_length: int = 256,
-) -> np.ndarray:
-    """Run the JUDGEBERT model on pairs and return predicted LMP scores."""
+def predict_with_model(model, tokenizer, df, device, batch_size=16, max_length=256):
     model.eval()
-    # Build a temporary DataFrame for the Dataset class
-    tmp = pd.DataFrame({
-        "original": originals,
-        "simplified": simplifieds,
-        "lmp_score": [5.0] * len(originals),  # dummy
-    })
     loader = DataLoader(
-        LMPDataset(tmp, tokenizer, max_length),
+        LMPDataset(df, tokenizer, max_length),
         batch_size=batch_size,
         shuffle=False,
     )
-    preds = []
+    predictions = []
     for batch in tqdm(loader, desc="Predict"):
-        input_ids = batch["input_ids"].to(device)
-        attention_mask = batch["attention_mask"].to(device)
-        out = model(input_ids=input_ids, attention_mask=attention_mask)
-        preds.extend(out["predictions"].cpu().numpy().tolist())
-    return np.array(preds)
-
-
-def run_sanity_checks(df: pd.DataFrame, pred_col: str = "judgebert_score") -> Dict:
-    """Evaluate identical and unrelated pairs."""
-    results = {}
-
-    identical = df[df["domain"] == "sanity_identical"]
-    if len(identical) > 0:
-        scores = identical[pred_col].values
-        results["identical"] = {
-            "n": len(identical),
-            "mean_pred": float(np.mean(scores)),
-            "min_pred": float(np.min(scores)),
-            "max_pred": float(np.max(scores)),
-            "pct_above_9": float(np.mean(scores >= 9.0) * 100),
-        }
-        print("\n--- Sanity Check: Identical pairs ---")
-        print(f"  N = {results['identical']['n']}")
-        print(f"  Mean predicted LMP = {results['identical']['mean_pred']:.2f}")
-        print(f"  % ≥ 9.0             = {results['identical']['pct_above_9']:.1f}%")
-
-    unrelated = df[df["domain"] == "sanity_unrelated"]
-    if len(unrelated) > 0:
-        scores = unrelated[pred_col].values
-        results["unrelated"] = {
-            "n": len(unrelated),
-            "mean_pred": float(np.mean(scores)),
-            "min_pred": float(np.min(scores)),
-            "max_pred": float(np.max(scores)),
-            "pct_below_2": float(np.mean(scores <= 2.0) * 100),
-        }
-        print("\n--- Sanity Check: Unrelated pairs ---")
-        print(f"  N = {results['unrelated']['n']}")
-        print(f"  Mean predicted LMP = {results['unrelated']['mean_pred']:.2f}")
-        print(f"  % ≤ 2.0             = {results['unrelated']['pct_below_2']:.1f}%")
-
-    return results
+        out = model(
+            input_ids=batch["input_ids"].to(device),
+            attention_mask=batch["attention_mask"].to(device),
+        )
+        predictions.extend(out["predictions"].cpu().numpy().tolist())
+    return np.asarray(predictions, dtype=float)
 
 
 def main(args):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    checkpoint = Path(args.checkpoint)
+    if not checkpoint.is_file():
+        raise SystemExit(
+            f"Trained checkpoint not found: {checkpoint}. "
+            "Evaluation stopped: SBERT is not a substitute for the LMP regressor. "
+            "Train the model first or provide --checkpoint."
+        )
+
+    data_path = Path(args.data)
+    known_synthetic = data_path.as_posix().endswith("data/lmp_dataset.jsonl")
+    if known_synthetic and not args.allow_simulated_label_metrics:
+        raise SystemExit(
+            "The default lmp_dataset.jsonl is documented as template-generated "
+            "with simulated scores. No human-performance metrics will be computed. "
+            "Use a genuinely human-annotated held-out CSV/JSONL, or pass "
+            "--allow-simulated-label-metrics only for a labelled smoke test."
+        )
+
     df = load_dataset(args.data)
+    required = {"original", "simplified", "lmp_score", "language"}
+    missing = required - set(df.columns)
+    if missing:
+        raise SystemExit("Dataset missing required columns: " + ", ".join(sorted(missing)))
+    if df.empty:
+        raise SystemExit("Dataset is empty.")
+    if df[["original", "simplified"]].isna().any().any():
+        raise SystemExit("Dataset contains missing original/simplified text.")
 
-    # Load model if checkpoint exists
-    ckpt_path = Path(args.checkpoint)
-    if ckpt_path.exists():
-        print(f"Loading model from {ckpt_path}")
-        ckpt = torch.load(ckpt_path, map_location=device)
-        model_name = ckpt.get("model_name", "xlm-roberta-base")
-        model = JudgeBERTRegressor(model_name=model_name).to(device)
-        model.load_state_dict(ckpt["model_state_dict"])
-        tokenizer = get_tokenizer(model_name)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    ckpt = torch.load(checkpoint, map_location=device, weights_only=True)
+    if not isinstance(ckpt, dict) or not isinstance(ckpt.get("model_state_dict"), dict):
+        raise SystemExit("Checkpoint must contain a model_state_dict mapping.")
+    model_name = ckpt.get("model_name", "xlm-roberta-base")
+    model = JudgeBERTRegressor(model_name=model_name).to(device)
+    model.load_state_dict(ckpt["model_state_dict"], strict=True)
+    tokenizer = get_tokenizer(model_name)
 
-        preds = predict_with_model(
-            model, tokenizer,
-            df["original"].tolist(),
-            df["simplified"].tolist(),
-            device,
-            batch_size=args.batch_size,
-        )
-        df["judgebert_score"] = preds
-        df["judgebert_decision"] = [decision_from_score(s) for s in preds]
-    else:
-        print(f"Checkpoint {ckpt_path} not found. Using SBERT as proxy for demonstration.")
-        from baselines import run_sbert
-        preds = run_sbert(df["original"].tolist(), df["simplified"].tolist())
-        df["judgebert_score"] = preds
-        df["judgebert_decision"] = [decision_from_score(s) for s in preds]
+    predictions = predict_with_model(
+        model, tokenizer, df, device,
+        batch_size=args.batch_size, max_length=args.max_length,
+    )
+    df["preservelex_lmp_prediction"] = predictions
+    df["predicted_decision"] = [decision_from_score(x) for x in predictions]
 
-    # Overall metrics
-    metrics = compute_metrics(df["lmp_score"].values, df["judgebert_score"].values)
-    print_metrics(metrics, "JUDGEBERT-style Model vs Human LMP (Overall)")
+    metrics = compute_metrics(
+        pd.to_numeric(df["lmp_score"], errors="raise").to_numpy(),
+        predictions,
+    )
+    evidence_type = (
+        "SIMULATED_LABEL_SMOKE_TEST_ONLY"
+        if known_synthetic or args.allow_simulated_label_metrics
+        else "LABEL_PROVENANCE_REQUIRES_EXTERNAL_VERIFICATION"
+    )
+    results = {
+        "model_name": model_name,
+        "checkpoint": str(checkpoint),
+        "dataset": str(data_path),
+        "evidence_type": evidence_type,
+        "n": int(len(df)),
+        "metrics_against_dataset_labels": metrics,
+        "warning": (
+            "These metrics are not human-validated research evidence."
+            if evidence_type != "LABEL_PROVENANCE_REQUIRES_EXTERNAL_VERIFICATION"
+            else "Verify annotation provenance, adjudication and split integrity before publication."
+        ),
+    }
 
-    results = {"overall": metrics, "by_language": {}, "sanity": {}}
-
-    # Per language
-    for lang in ["en", "hi"]:
-        mask = df["language"] == lang
-        if mask.sum() == 0:
-            continue
-        m = compute_metrics(
-            df.loc[mask, "lmp_score"].values,
-            df.loc[mask, "judgebert_score"].values,
-        )
-        print_metrics(m, f"Language = {lang.upper()}")
-        results["by_language"][lang] = m
-
-    # Sanity checks
-    results["sanity"] = run_sanity_checks(df, "judgebert_score")
-
-    # Save
-    out_dir = Path(args.output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    df.to_csv(out_dir / "full_predictions.csv", index=False)
-    save_results(results, str(out_dir / "evaluation_metrics.json"))
-    print(f"\nEvaluation complete. Results in {out_dir}")
+    output = Path(args.output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    df.to_csv(output / "predictions.csv", index=False)
+    save_results(results, str(output / "evaluation_metrics.json"))
+    print_metrics(metrics, "Model vs dataset labels (inspect evidence_type before reporting)")
+    print(f"Evidence type: {evidence_type}")
+    print(f"Saved outputs to: {output}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Research-safe PreserveLex model evaluation")
     parser.add_argument("--data", default="data/lmp_dataset.jsonl")
     parser.add_argument("--checkpoint", default="models/judgebert_xlmr/best_model.pt")
     parser.add_argument("--output_dir", default="results")
     parser.add_argument("--batch_size", type=int, default=16)
-    args = parser.parse_args()
-    main(args)
+    parser.add_argument("--max_length", type=int, default=256)
+    parser.add_argument(
+        "--allow-simulated-label-metrics",
+        action="store_true",
+        help="Allow metrics against known simulated labels for smoke testing only.",
+    )
+    main(parser.parse_args())
