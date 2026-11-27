@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """
 Generate a professional IEEE-style research paper (Word .docx)
-for the multilingual JUDGEBERT LMP project.
+for the multilingual JUDGEBERT / PreserveLex LMP project.
+
+This version follows a careful evidence-aligned style:
+- No unsubstantiated superiority claims
+- Explicitly marks simulated labels
+- Includes TF-IDF lexical baseline
+- Reports ASSET as out-of-domain diagnostic only
 """
 
 from docx import Document
-from docx.shared import Pt, Inches, Cm, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-from docx.enum.style import WD_STYLE_TYPE
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
-from docx.oxml import OxmlElement
 import os
+
 
 def set_run_font(run, name="Times New Roman", size=10, bold=False, italic=False):
     run.font.name = name
@@ -19,12 +24,12 @@ def set_run_font(run, name="Times New Roman", size=10, bold=False, italic=False)
     run.bold = bold
     run.italic = italic
 
+
 def add_heading_styled(doc, text, level=1):
     p = doc.add_paragraph()
     run = p.add_run(text)
     if level == 1:
         set_run_font(run, size=12, bold=True)
-        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         p.paragraph_format.space_before = Pt(12)
         p.paragraph_format.space_after = Pt(6)
     else:
@@ -32,6 +37,7 @@ def add_heading_styled(doc, text, level=1):
         p.paragraph_format.space_before = Pt(10)
         p.paragraph_format.space_after = Pt(4)
     return p
+
 
 def add_body(doc, text, first_indent=True):
     p = doc.add_paragraph()
@@ -43,10 +49,10 @@ def add_body(doc, text, first_indent=True):
         p.paragraph_format.first_line_indent = Inches(0.25)
     return p
 
+
 def create_paper(output_path="docs/IEEE_Paper_Multilingual_JUDGEBERT.docx"):
     doc = Document()
 
-    # Page setup – approximate IEEE two-column feel with single-column for readability
     section = doc.sections[0]
     section.page_width = Inches(8.5)
     section.page_height = Inches(11)
@@ -59,16 +65,16 @@ def create_paper(output_path="docs/IEEE_Paper_Multilingual_JUDGEBERT.docx"):
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = title.add_run(
-        "Explainable Multilingual Legal Meaning Preservation\nUsing JUDGEBERT: An Extension to English and Hindi"
+        "PreserveLex: An Explainable Multilingual Framework for\n"
+        "Legal Meaning Preservation in English and Hindi Contracts"
     )
     set_run_font(run, size=14, bold=True)
     title.paragraph_format.space_after = Pt(12)
 
-    # Authors (placeholder for student team)
     authors = doc.add_paragraph()
     authors.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = authors.add_run(
-        "Student Team\n"
+        "Kartik Nagar · Mohita Purohit · Samriddhi Sharma · Parth Sharma\n"
         "Department of Computer Science and Engineering\n"
         "Bennett University, Greater Noida, India\n"
         "CSET 346 – Natural Language Processing\n"
@@ -84,18 +90,18 @@ def create_paper(output_path="docs/IEEE_Paper_Multilingual_JUDGEBERT.docx"):
     abs_head.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     abstract_text = (
-        "Legal text simplification aims to improve accessibility while preserving the original legal meaning. "
-        "Generic semantic similarity metrics often fail in the legal domain because linguistically similar sentences "
-        "may alter obligations, conditions, exceptions, or scope. Building on JUDGEBERT (Beauchemin et al., EMNLP 2025), "
-        "which introduced Legal Meaning Preservation (LMP) for French insurance text, we present a multilingual extension "
-        "to English and Hindi. We construct a bilingual dataset of 334 original–simplified legal sentence pairs with LMP "
-        "annotations (1–10 scale), implement strong baselines (multilingual Sentence-BERT and BERTScore), and fine-tune "
-        "an XLM-RoBERTa regression model in the JUDGEBERT style. Experiments show that the supervised LMP model "
-        "correlates more strongly with human judgments than generic semantic similarity, passes identical- and "
-        "unrelated-pair sanity checks more reliably, and generalizes across the two languages. Qualitative analysis of "
-        "difficult cases reveals systematic failures of embedding-based metrics on obligation and exception changes. "
-        "The resulting system produces an LMP score, a preservation decision, optional error types, and a short "
-        "explanation, providing an explainable and domain-aware evaluation metric for legal text simplification."
+        "Legal text simplification must improve readability without changing obligations, permissions, conditions, "
+        "exceptions, parties, amounts, or deadlines. General semantic similarity can reward topical overlap even when "
+        "a legally operative relation is reversed. This paper presents PreserveLex, a research prototype for "
+        "sentence-pair legal meaning preservation (LMP) in English and Hindi. Its learned scorer uses XLM-RoBERTa-base "
+        "with a regression head to estimate a 1–10 preservation score. A separate advisory rule layer reports potential "
+        "changes across five dimensions. We describe the architecture, data resources, provenance controls, and a "
+        "reproducible comparison protocol against original JUDGEBERT and multilingual baselines (including a TF-IDF "
+        "lexical baseline). The available development corpus and workbook contain synthetic or simulated labels. "
+        "An out-of-domain diagnostic on the ASSET simplification dataset shows that TF-IDF currently correlates more "
+        "strongly with human meaning ratings than the legal-specialized model, as expected for general-domain text. "
+        "Accordingly, this paper does not claim human-validated accuracy, Hindi performance superiority, or overall "
+        "superiority over JUDGEBERT. It defines the experiments required to test those claims."
     )
     add_body(doc, abstract_text, first_indent=False)
 
@@ -103,173 +109,139 @@ def create_paper(output_path="docs/IEEE_Paper_Multilingual_JUDGEBERT.docx"):
     run = kw.add_run("Index Terms—")
     set_run_font(run, size=10, bold=True)
     run = kw.add_run(
-        "Legal NLP, text simplification, meaning preservation, multilingual models, "
-        "JUDGEBERT, Hindi, explainability, evaluation metrics."
+        "Legal meaning preservation, legal text simplification, multilingual NLP, XLM-RoBERTa, "
+        "JUDGEBERT, TF-IDF baseline, explainable AI, contract analysis."
     )
     set_run_font(run, size=10, italic=True)
 
     # ---------- 1. Introduction ----------
     add_heading_styled(doc, "I. INTRODUCTION", level=1)
     add_body(doc,
-        "Automatic text simplification (ATS) seeks to produce easier-to-read text while retaining the original meaning. "
-        "In high-stakes domains such as law, meaning preservation is especially critical: an incorrect simplification "
-        "can change legal obligations, create liability, or mislead lay users. The recent JUDGEBERT work introduced "
-        "Legal Meaning Preservation (LMP) as a distinct evaluation dimension and released FrJUDGE, a French insurance "
-        "dataset of 297 human-annotated sentence pairs, together with a CamemBERT-based regression metric that "
-        "correlates substantially better with human legal judgments than existing generic metrics."
+        "Legal clauses encode operative relationships, not merely topics. A paraphrase can preserve most words yet "
+        "reverse who owes a duty, remove a condition precedent, weaken a prohibition, or change a deadline. The "
+        "problem matters in multilingual settings such as India, where contracts may be drafted in English while "
+        "readers prefer Hindi or other languages. JUDGEBERT introduced a learned legal meaning preservation metric "
+        "for French legal sentences and the FrJUDGE dataset. PreserveLex adopts the task framing and combines an "
+        "XLM-RoBERTa pair regressor with a separate advisory review layer."
     )
     add_body(doc,
-        "Despite its contributions, JUDGEBERT is limited to French and to the property-damage insurance domain. "
-        "The original paper explicitly notes limited language and domain coverage, the modest size of the annotated "
-        "resource, sentence-level evaluation outside full document context, and the absence of out-of-domain evaluation "
-        "as important gaps. This project directly addresses language generalization and provides a first step toward "
-        "broader legal-domain coverage by extending the JUDGEBERT paradigm to English and Hindi, two languages of "
-        "major practical importance in the Indian legal system."
-    )
-    add_body(doc,
-        "Our contributions are: (1) a bilingual English–Hindi dataset of 334 original–simplified legal sentence pairs "
-        "with LMP scores and error-type annotations; (2) a reproducible JUDGEBERT-inspired multilingual regression "
-        "pipeline based on XLM-RoBERTa; (3) a systematic comparison against multilingual Sentence-BERT and BERTScore "
-        "baselines; (4) language-wise analysis, sanity checks, and a qualitative error analysis of at least 15 legally "
-        "difficult cases; and (5) an end-to-end system that outputs an LMP score, a discrete preservation decision, "
-        "optional error types, and a short natural-language explanation."
+        "Research questions: (RQ1) Can an XLM-RoBERTa pair regressor provide an LMP score interface for English and "
+        "Hindi? (RQ2) Can separate rule checks expose legally salient changes that a scalar score may overlook? "
+        "(RQ3) How does PreserveLex compare with original JUDGEBERT and multilingual / lexical baselines on a common "
+        "human-annotated test set? (RQ4) How robust are the systems to targeted legal-boundary perturbations?"
     )
 
     # ---------- 2. Related Work ----------
-    add_heading_styled(doc, "II. RELATED WORK", level=1)
+    add_heading_styled(doc, "II. BACKGROUND AND RELATED WORK", level=1)
     add_body(doc,
-        "Meaning preservation has long been recognized as one of the three core dimensions of ATS evaluation "
-        "(alongside fluency and simplicity). Early metrics relied on n-gram overlap (BLEU, SARI) and later on "
-        "embedding-based similarity (BERTScore, Sentence-BERT). Beauchemin et al. (2023) showed that many of these "
-        "metrics correlate only weakly with human meaning judgments and fail simple sanity checks on identical and "
-        "unrelated pairs; they introduced MeaningBERT as a supervised alternative. JUDGEBERT (2025) specialized "
-        "this idea to the legal domain, arguing that legal meaning is stricter than ordinary semantic equivalence "
-        "because synonyms and near-paraphrases can still alter legal effect."
-    )
-    add_body(doc,
-        "In the Indian context, resources such as HLDC (Hindi Legal Documents Corpus), MILDSum (multilingual legal "
-        "summarization), and MILPaC (parallel legal text) have advanced legal NLP for Hindi and other Indian languages. "
-        "However, none of these resources provide human judgments of legal meaning preservation between original and "
-        "simplified sentences. Our work fills this gap by constructing the first LMP-oriented bilingual resource "
-        "covering English and Hindi legal text."
+        "Beauchemin et al. introduced FrJUDGE and JUDGEBERT (CamemBERT-baseV2 regression). XLM-RoBERTa provides "
+        "multilingual encoding. Sentence-BERT and BERTScore are strong generic similarity baselines. TF-IDF cosine "
+        "similarity remains a useful lexical baseline that often performs well when surface form is informative. "
+        "None of the generic methods inherently enforces party-role, modality, or exception invariants."
     )
 
     # ---------- 3. Problem Formulation ----------
     add_heading_styled(doc, "III. PROBLEM FORMULATION", level=1)
     add_body(doc,
-        "Given an original legal sentence s and a simplified or reformulated sentence s′, the goal is to predict a "
-        "continuous Legal Meaning Preservation score y ∈ [1, 10] that reflects how completely the legal effect of s "
-        "is retained in s′. From the score we derive a discrete decision: Preserved (y ≥ 8), Partially Preserved "
-        "(5 ≤ y < 8), or Not Preserved (y < 5). Optionally, the system also emits one or more error types from a "
-        "fixed taxonomy (omission, hallucination, contradiction, obligation, permission, condition, exception, scope, "
-        "date, numbers, entities) and a short textual explanation."
-    )
-    add_body(doc,
-        "Research question: How effectively can a JUDGEBERT-style model assess legal meaning preservation in English "
-        "and Hindi, and does it outperform generic semantic-similarity approaches on this task?"
+        "Given an original clause x, a candidate simplification z, and a language indicator, the neural component "
+        "estimates a score ŷ ∈ [1, 10]. In parallel, an advisory function returns possible findings across five "
+        "dimensions: Obligations, Rights and permissions, Deadlines and amounts, Conditions and exceptions, and "
+        "Scope and parties. The displayed result is the pair (score, findings); the two paths are intentionally not "
+        "fused into a single hidden weighted score."
     )
 
-    # ---------- 4. Dataset ----------
-    add_heading_styled(doc, "IV. DATASET", level=1)
+    # ---------- 4. Architecture ----------
+    add_heading_styled(doc, "IV. PRESERVELEX ARCHITECTURE", level=1)
     add_body(doc,
-        "We constructed a bilingual dataset of 334 original–simplified pairs (167 English, 167 Hindi). Source material "
-        "was drawn from typical property and general insurance clauses and Indian-style contract language. Each "
-        "original sentence was paired with both a high-quality simplification that preserves legal meaning and a "
-        "degraded simplification that deliberately alters one or more critical elements (conditions, exceptions, "
-        "obligations, notice periods, etc.). LMP scores were assigned according to detailed annotation guidelines "
-        "that mirror the original FrJUDGE protocol: high scores (8–10) for near-perfect preservation, low scores "
-        "(1–4) for contradictions or major omissions. Explicit identical pairs (score = 10) and unrelated pairs "
-        "(score = 1) were included for sanity-check evaluation."
-    )
-    add_body(doc,
-        "Although the current scores are generated from controlled templates that embody the annotation principles, "
-        "the pipeline is designed so that genuine multi-annotator human judgments can replace the simulated scores "
-        "with minimal code changes. Inter-annotator agreement and majority/average aggregation can then be reported "
-        "exactly as in the original paper."
+        "Neural path: XLM-RoBERTa-base encodes the sentence pair (max 256 tokens). A regression head (dropout → "
+        "linear → ReLU → dropout → scalar) produces the LMP score, clamped to [1, 10]. Training uses a SmoothL1-style "
+        "loss. Advisory path: explicit patterns and lexical cues flag possible changes on the five dimensions. "
+        "A warning means “inspect this change,” not “the candidate is legally wrong.”"
     )
 
-    # ---------- 5. Method ----------
-    add_heading_styled(doc, "V. METHOD", level=1)
+    # ---------- 5. Data ----------
+    add_heading_styled(doc, "V. DATASETS AND PROVENANCE", level=1)
+    add_body(doc,
+        "Development corpus: 334 pairs (English/Hindi), template-generated with simulated labels. Filled workbook: "
+        "100 English pairs with synthetic reference annotations across Insurance, Contract, Employment, Tenancy and "
+        "Consumer domains. Insurance pilot: 10 source-linked clauses awaiting independent annotation. All current "
+        "labels are synthetic or simulated; they support pipeline testing but must not be presented as human gold."
+    )
+    add_body(doc,
+        "Recommended split policy: pairs derived from the same source clause must remain in one partition. The final "
+        "evaluation set must be held out from model selection, threshold tuning and rule development."
+    )
+
+    # ---------- 6. Experimental Design ----------
+    add_heading_styled(doc, "VI. EXPERIMENTAL DESIGN", level=1)
     add_heading_styled(doc, "A. Baselines", level=2)
     add_body(doc,
-        "We implement two strong generic semantic-similarity baselines. (1) Multilingual Sentence-BERT "
-        "(paraphrase-multilingual-MiniLM-L12-v2): cosine similarity of the two sentence embeddings, linearly mapped "
-        "to the [1, 10] range. (2) BERTScore with XLM-RoBERTa-base: token-level F1 similarly rescaled to [1, 10]. "
-        "These baselines represent the best readily available unsupervised metrics that operate on both English and Hindi."
+        "We compare against: (i) TF-IDF cosine similarity (1–2 gram, scaled to [1, 10]) as a simple lexical baseline; "
+        "(ii) multilingual Sentence-BERT cosine similarity; (iii) BERTScore with XLM-RoBERTa-base; and (iv) the "
+        "original JUDGEBERT configuration when a common test set becomes available. All systems receive the same "
+        "source/candidate pairs. Scale calibration, if needed, is fitted only on training/development data."
     )
-    add_heading_styled(doc, "B. JUDGEBERT-Inspired Model", level=2)
+    add_heading_styled(doc, "B. Metrics", level=2)
     add_body(doc,
-        "Following the architecture of JUDGEBERT / MeaningBERT, we fine-tune XLM-RoBERTa-base as a regression model. "
-        "The input is the concatenation of the original and simplified sentences separated by the model’s separator "
-        "token. The [CLS] representation is passed through a small feed-forward head that outputs a scalar LMP score. "
-        "Training uses Smooth L1 loss; predictions are clamped to [1, 10]. We train for a small number of epochs with "
-        "AdamW and a linear warm-up schedule, selecting the checkpoint with the lowest validation RMSE."
+        "Report Pearson correlation, Spearman rank correlation, MAE and RMSE against adjudicated human scores, with "
+        "bootstrap confidence intervals where possible. Report results separately for English and Hindi and by domain. "
+        "Correlation alone is insufficient: a system can rank pairs well while making large absolute score errors."
     )
-    add_heading_styled(doc, "C. Explainability", level=2)
+    add_heading_styled(doc, "C. Out-of-Domain Diagnostic (ASSET)", level=2)
     add_body(doc,
-        "In addition to the continuous score and discrete decision, the system attaches error-type labels (when "
-        "available from the annotation) and generates a short natural-language explanation that summarizes the "
-        "principal legal meaning change. This fulfills the project requirement for an explainable system."
-    )
-
-    # ---------- 6. Experiments ----------
-    add_heading_styled(doc, "VI. EXPERIMENTS AND RESULTS", level=1)
-    add_body(doc,
-        "We evaluate with Pearson correlation, Spearman rank correlation, RMSE and MAE against the human (or "
-        "simulated-human) LMP scores. We also report language-specific metrics and perform the two mandatory sanity "
-        "checks: identical pairs should receive high scores; unrelated pairs should receive near-floor scores."
+        "As a diagnostic on general-domain text, we evaluated on 100 pairs from the ASSET simplification dataset "
+        "(human meaning ratings rescaled to 1–10). Observed metrics:"
     )
     add_body(doc,
-        "On the full set the supervised model achieves substantially higher Pearson correlation and lower RMSE than "
-        "the Sentence-BERT baseline, confirming that task-specific supervision captures legal meaning better than "
-        "generic semantic similarity. Performance is comparable on English and Hindi, indicating successful "
-        "cross-lingual transfer of the LMP notion. The model also passes the identical-pair and unrelated-pair "
-        "sanity checks at a higher rate than the unsupervised baselines, consistent with the findings of the original "
-        "JUDGEBERT paper when data augmentation with sanity examples is used."
+        "PreserveLex (current checkpoint): Pearson ≈ 0.078, Spearman ≈ 0.062, MAE ≈ 2.53, RMSE ≈ 3.17. "
+        "TF-IDF (1–2 gram): Pearson ≈ 0.642, Spearman ≈ 0.629, MAE ≈ 2.03, RMSE ≈ 2.47."
     )
     add_body(doc,
-        "Qualitative analysis of 18 difficult cases shows that embedding-based metrics frequently assign high "
-        "similarity scores to pairs in which a critical condition or exception has been dropped, or an obligation "
-        "has been softened from “shall” to a weaker modal. The supervised model is more sensitive to these "
-        "legally consequential changes, although residual errors remain on subtle scope and entity substitutions."
+        "Interpretation: ASSET is not legal text. Lexical overlap is a strong signal on general-domain simplification, "
+        "so TF-IDF outperforms a model specialized on simulated legal pairs. This result is reported as an "
+        "out-of-domain diagnostic only; it does not constitute a claim about legal LMP performance. Primary evaluation "
+        "must use independently annotated legal pairs with source-clause-disjoint splits."
     )
 
-    # ---------- 7. Discussion ----------
-    add_heading_styled(doc, "VII. DISCUSSION AND LIMITATIONS", level=1)
+    # ---------- 7. Current Evidence Status ----------
+    add_heading_styled(doc, "VII. CURRENT EVIDENCE AND RESULTS STATUS", level=1)
     add_body(doc,
-        "The results support the central claim of JUDGEBERT: legal meaning preservation is a distinct and learnable "
-        "target that generic semantic similarity only partially approximates. Extending the approach to Hindi "
-        "demonstrates that the same modeling paradigm transfers to an Indian language with a different script and "
-        "legal-administrative tradition."
-    )
-    add_body(doc,
-        "Limitations of the present study include the use of template-based (simulated) annotations rather than "
-        "large-scale independent human annotation, the restriction to sentence-level evaluation without full document "
-        "context, and the relatively modest dataset size. Future work should collect genuine multi-annotator judgments, "
-        "explore context-aware (paragraph- or document-level) LMP, enlarge the resource, and test generalization to "
-        "additional Indian languages and legal domains (statutes, judgments, consumer contracts)."
+        "At the time of writing, available data support implementation and pipeline testing, not a benchmark "
+        "performance claim. No verified bilingual human test set or same-test-set comparison against original "
+        "JUDGEBERT, Sentence-BERT, BERTScore or TF-IDF on legal text is available. Earlier internal metrics computed "
+        "against simulated labels with unverified split provenance are excluded from the evidence base of this paper."
     )
 
-    # ---------- 8. Conclusion ----------
-    add_heading_styled(doc, "VIII. CONCLUSION", level=1)
+    # ---------- 8. Limitations ----------
+    add_heading_styled(doc, "VIII. LIMITATIONS, ETHICS AND FUTURE WORK", level=1)
     add_body(doc,
-        "We have presented a professional, reproducible extension of JUDGEBERT to English and Hindi. The resulting "
-        "system predicts an LMP score, a preservation decision, error types and a short explanation, and outperforms "
-        "strong generic semantic-similarity baselines on both languages. The work directly addresses the language-"
-        "generalization gap identified in the original paper and provides a solid foundation for further research on "
-        "explainable, domain-aware evaluation of legal text simplification."
+        "Current development labels are simulated or synthetic. The advisory layer relies on lexical patterns and may "
+        "miss indirect or paraphrased changes. PreserveLex is a research and decision-support prototype, not a source "
+        "of legal advice. Future work includes independent double annotation, a source-verified Hindi test set, "
+        "leakage-resistant splits, controlled baseline comparisons with confidence intervals, and stronger multilingual "
+        "rule coverage."
+    )
+
+    # ---------- 9. Conclusion ----------
+    add_heading_styled(doc, "IX. CONCLUSION", level=1)
+    add_body(doc,
+        "This paper presented PreserveLex, a JUDGEBERT-inspired multilingual system for assessing whether a simplified "
+        "legal clause preserves the meaning of its source. It couples an XLM-RoBERTa regression model with transparent "
+        "advisory checks over five legal review dimensions. The separation of a scalar estimate from rule-based "
+        "warnings is a design choice intended to support reviewer inspection. The central claim of superiority over "
+        "original JUDGEBERT or over strong lexical and semantic baselines remains unproven and requires independently "
+        "annotated, same-test-set evidence."
     )
 
     # ---------- References ----------
     add_heading_styled(doc, "REFERENCES", level=1)
     refs = [
-        '[1] D. Beauchemin, M. Albert-Rochette, R. Khoury, and P.-L. Déziel, "JUDGEBERT: Assessing Legal Meaning Preservation Between Sentences," in Proc. EMNLP, 2025, pp. 92–118.',
-        '[2] D. Beauchemin, H. Saggion, and R. Khoury, "MeaningBERT: Assessing meaning preservation between sentences," Front. Artif. Intell., vol. 6, 2023.',
-        '[3] A. Kapoor et al., "HLDC: Hindi Legal Documents Corpus," in Findings of ACL, 2022.',
-        '[4] D. Datta et al., "MILDSum: A Novel Benchmark Dataset for Multilingual Summarization of Indian Legal Case Judgments," in Proc. EMNLP, 2023.',
-        '[5] T. Zhang et al., "BERTScore: Evaluating Text Generation with BERT," in Proc. ICLR, 2020.',
-        '[6] N. Reimers and I. Gurevych, "Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks," in Proc. EMNLP, 2019.',
-        '[7] A. Conneau et al., "Unsupervised Cross-lingual Representation Learning at Scale," in Proc. ACL, 2020.',
+        '[1] D. Beauchemin, M.-A. Albert-Rochette, R. Khoury, and P. Déziel, "JUDGEBERT: Assessing legal meaning preservation between sentences," in Proc. EMNLP, 2025.',
+        '[2] N. Reimers and I. Gurevych, "Sentence-BERT: Sentence embeddings using Siamese BERT-networks," in Proc. EMNLP-IJCNLP, 2019.',
+        '[3] T. Zhang et al., "BERTScore: Evaluating text generation with BERT," in Proc. ICLR, 2020.',
+        '[4] A. Conneau et al., "Unsupervised cross-lingual representation learning at scale," in Proc. ACL, 2020.',
+        '[5] I. Chalkidis et al., "LEGAL-BERT: The muppets straight out of law school," in Findings of EMNLP, 2020.',
+        '[6] D. Beauchemin, H. Saggion, and R. Khoury, "MeaningBERT: Assessing meaning preservation between sentences," Front. Artif. Intell., 2023.',
     ]
     for r in refs:
         p = doc.add_paragraph()
@@ -279,7 +251,6 @@ def create_paper(output_path="docs/IEEE_Paper_Multilingual_JUDGEBERT.docx"):
         p.paragraph_format.left_indent = Inches(0.25)
         p.paragraph_format.first_line_indent = Inches(-0.25)
 
-    # Save
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     doc.save(output_path)
     print(f"IEEE-style paper saved to {output_path}")
