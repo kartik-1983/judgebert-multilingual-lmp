@@ -49,6 +49,18 @@ A high score is not allowed when a material legal invariant is changed, omitted 
 ## Quality checks and splits
 Deduplicate exact/near-duplicate pairs. Split by source-document ID, never randomly by row. Keep a held-out test set untouched. Report language, jurisdiction, source-document counts, reviewer count, missingness, score distribution, weighted Cohen's kappa where suitable, and adjudication rate. Do not claim improvement until baseline and updated model are compared on the same untouched, independently annotated test set.
 
+## English-first annotation batch (added 27 November 2026)
+
+The repository includes an English-only queue of 20 candidate legal pairs extracted from the project's unique-pair review set. These are **annotation candidates, not human-annotated gold data**. The original wording is attributed in the project materials to the Generali Central Insurance Company Ltd. Standard Fire & Special Perils Policy; annotators must verify the exact provision, source URL, current wording and reuse basis before accepting each row. Candidate simplifications were project-drafted and have not yet been independently approved.
+
+Use separate blind reviewer sheets:
+- `data/human_lmp_annotations/reviewer_A001_english.csv`
+- `data/human_lmp_annotations/reviewer_A002_english.csv`
+
+Do not share one reviewer's completed scores with the other reviewer. Keep source-verification fields pending until evidence is recorded. After both reviewers finish, transfer their independent ratings into the master `annotation_template.csv` structure and obtain adjudication. Exclude rows that fail source verification or lack two independent reviews and adjudication.
+
+The batch is a starting pilot (20 unique English legal pairs), not a sufficient benchmark by itself. Expand the corpus with additional licensed, source-verified legal clauses and independently reviewed simplifications before making model-performance claims.
+
 ## Workflow
 1. Copy data/human_lmp_annotations/annotation_template.csv to a working file.
 2. Add legally sourced original/simplified pairs and provenance.
