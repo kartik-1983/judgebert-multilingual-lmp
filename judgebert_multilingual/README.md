@@ -1,5 +1,7 @@
 # Explainable Multilingual Legal Meaning Preservation Using JUDGEBERT
 
+> **Research integrity note (read before reporting results):** The checked-in 334-pair dataset is template-generated and its LMP scores are simulated, not human annotations. Its domain labels are randomly assigned and cannot support a domain-generalization claim. Treat it as development/smoke-test data only. A blank human annotation sheet and annotation tools are provided; empirical claims require genuine independent ratings and saved held-out evaluation outputs.
+
 **CSET 346 – Natural Language Processing**  
 **Project Title:** Explainable Multilingual Legal Meaning Preservation Using JUDGEBERT
 
@@ -124,3 +126,83 @@ This educational project is released for academic use. When using the code or id
 ---
 
 *Built as a professional, reproducible extension of JUDGEBERT for multilingual (English–Hindi) legal meaning preservation.*
+
+
+## Human annotation and research-compliance workflow
+
+- Annotation rubric: `docs/annotation_guidelines.md`
+- Blank sheet (334 pairs): `data/human_annotation_template.csv`
+- Prepare a fresh sheet: `python src/annotation_tools.py template`
+- Aggregate completed ratings (at least two independent annotators per pair):
+  `python src/annotation_tools.py aggregate --input data/human_annotations_filled.csv`
+- Experiment requirements and evidence checklist: `docs/experiment_protocol.md`
+- Starting bilingual sanity suite: `docs/sanity_test_cases.csv`
+- Research status and claim limits: `README_RESEARCH_STATUS.md`
+
+Do not present synthetic labels as human judgments, randomly assigned domains as domain generalization, or model superiority as established without a fair held-out comparison.
+
+## Running the PreserveLex application with the trained model
+
+The Gradio application entry point is `app.py`. Start it from the
+`judgebert_multilingual/` directory:
+
+```bash
+python app.py
+```
+
+The application loads the fine-tuned checkpoint from
+`models/judgebert_xlmr/best_model.pt` by default. The checkpoint is intentionally
+not stored in Git because of its size. If it is stored elsewhere, configure an
+absolute path before starting the application:
+
+PowerShell:
+
+```powershell
+$env:PLX_CHECKPOINT_PATH = "D:\\models\\best_model.pt"
+python app.py
+```
+
+Linux/macOS:
+
+```bash
+export PLX_CHECKPOINT_PATH="/path/to/best_model.pt"
+python app.py
+```
+
+**Scoring safety:** PreserveLex now fails closed if the fine-tuned checkpoint is
+missing, unreadable, or incompatible. It displays the reason and does not produce
+an LMP score or a Preserved/Partially preserved/Not preserved verdict. Generic
+SBERT cosine similarity is not used as a substitute for legal meaning-preservation
+prediction. The model-status message in the application shows whether the trained
+checkpoint loaded successfully.
+
+Only use a checkpoint produced for this repository's `JudgeBERTRegressor`
+architecture and matching tokenizer/base model. Do not load untrusted checkpoint
+files.
+
+
+
+## External internet-sourced legal dataset
+
+The project now includes an importer for the **Supreme Court and High Court Orders Parallel Corpus (English-Hindi)** from Hugging Face:
+
+- Dataset: https://huggingface.co/datasets/Wasserstoff-AI/legalTransEn_Indic
+- Dataset card reports approximately 89,951 aligned English-Hindi legal sentence pairs.
+- License shown on the dataset card: MIT.
+- Import script: `src/import_legal_parallel_corpus.py`
+- Documentation: `docs/external_legal_dataset.md`
+
+Run from this directory:
+
+```powershell
+pip install datasets pandas
+python src/import_legal_parallel_corpus.py
+```
+
+For a 100-row trial:
+
+```powershell
+python src/import_legal_parallel_corpus.py --max-rows 100
+```
+
+**Research-integrity limitation:** These are English-Hindi legal translation pairs, not original-versus-simplified pairs, and they have no LMP ratings. The importer saves them as an auxiliary multilingual legal corpus and creates a blank human-review sheet. It deliberately does not invent LMP labels or add them to the supervised LMP regression training set. The existing 334 synthetic pairs remain synthetic. A separate, properly licensed legal simplification dataset with human-validated LMP annotations is still needed for direct supervised LMP training and evaluation.

@@ -53,22 +53,23 @@ def run_bertscore(
     lang: str = "en",
     model_type: str = "xlm-roberta-base",
 ) -> np.ndarray:
-    """Compute BERTScore F1 and scale to [1, 10]."""
-    print(f"Computing BERTScore (model={model_type})...")
-    # BERTScore returns P, R, F1
+    """Compute multilingual XLM-R BERTScore F1 and scale to [1, 10].
+
+    Pass lang=None because model_type explicitly selects a multilingual encoder;
+    do not silently score Hindi with the English-only fallback.
+    """
+    print(f"Computing multilingual BERTScore (model={model_type}, lang={lang})...")
     _, _, f1 = bert_score(
         simplifieds,
         originals,
-        lang=lang if lang in ("en", "zh", "de", "fr") else "en",  # fallback
+        lang=None,
         model_type=model_type,
         verbose=True,
         device="cuda" if torch.cuda.is_available() else "cpu",
+        rescale_with_baseline=False,
     )
-    f1 = f1.numpy()
-    # F1 is roughly [0,1]; map to [1,10]
-    scores = 1.0 + 9.0 * f1
+    scores = 1.0 + 9.0 * f1.cpu().numpy()
     return scores.astype(float)
-
 
 def evaluate_baselines(
     data_path: str = "data/lmp_dataset.jsonl",
@@ -90,23 +91,36 @@ def evaluate_baselines(
     print_metrics(metrics_sbert, "SBERT vs Human LMP (Overall)")
     results["overall"]["sbert"] = metrics_sbert
 
-    # ---- BERTScore (approximate; run on English primarily for speed) ----
-    print("\n>>> Running BERTScore baseline (may take time)...")
-    # For mixed language we still use a multilingual model
-    try:
-        bs_scores = run_bertscore(
-            df["original"].tolist(),
-            df["simplified"].tolist(),
-            model_type="xlm-roberta-base",
+    # ---- Multilingual BERTScore, evaluated independently per language ----
+    print("\n>>> Running multilingual XLM-R BERTScore baseline...")
+    df["bertscore"] = np.nan
+    results["overall"]["bertscore"] = {}
+    results["by_language"].setdefault("en", {})
+    results["by_language"].setdefault("hi", {})
+    for lang in ["en", "hi"]:
+        mask = df["language"] == lang
+        if not mask.any():
+            continue
+        try:
+            scores = run_bertscore(
+                df.loc[mask, "original"].tolist(),
+                df.loc[mask, "simplified"].tolist(),
+                lang=lang,
+                model_type="xlm-roberta-base",
+            )
+            df.loc[mask, "bertscore"] = scores
+            metrics = compute_metrics(df.loc[mask, "lmp_score"].values, scores)
+            print_metrics(metrics, f"BERTScore – Language = {lang.upper()}")
+            results["by_language"][lang]["bertscore"] = metrics
+        except Exception as e:
+            print(f"BERTScore failed for {lang}: {e}")
+            results["by_language"][lang]["bertscore"] = {"error": str(e)}
+    valid = df["bertscore"].notna()
+    if valid.any():
+        results["overall"]["bertscore"] = compute_metrics(
+            df.loc[valid, "lmp_score"].values, df.loc[valid, "bertscore"].values
         )
-        df["bertscore"] = bs_scores
-        metrics_bs = compute_metrics(df["lmp_score"].values, bs_scores)
-        print_metrics(metrics_bs, "BERTScore vs Human LMP (Overall)")
-        results["overall"]["bertscore"] = metrics_bs
-    except Exception as e:
-        print(f"BERTScore failed or skipped: {e}")
-        df["bertscore"] = np.nan
-        results["overall"]["bertscore"] = {"error": str(e)}
+        print_metrics(results["overall"]["bertscore"], "BERTScore vs LMP labels (available language rows)")
 
     # Per-language breakdown for SBERT
     for lang in ["en", "hi"]:

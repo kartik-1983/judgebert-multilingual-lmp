@@ -1,0 +1,19 @@
+
+# Python environment and generated files
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local annotation experiments (not validated human ground truth)
+data/AI_preannotation_NOT_HUMAN.csv
+data/simulated_*.csv
+data/reviewer_*.csv
+data/pilot_annotations.csv
+data/pilot_annotations_completed.csv
+data/pilot_human_reference.csv
+data/human_annotations_filled.csv
+
+# Local model checkpoints
+models/
