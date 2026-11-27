@@ -48,22 +48,27 @@ def main(args):
         )
 
     data_path = Path(args.data)
-    known_synthetic = data_path.as_posix().endswith("data/lmp_dataset.jsonl")
+    df = load_dataset(args.data)
+    provenance_values = (
+        set(df["label_provenance"].dropna().astype(str).str.lower())
+        if "label_provenance" in df.columns else set()
+    )
+    marked_synthetic = any("synthetic" in value or "simulated" in value for value in provenance_values)
+    known_synthetic = (
+        data_path.as_posix().endswith("data/lmp_dataset.jsonl") or marked_synthetic
+    )
     if known_synthetic and not args.allow_simulated_label_metrics:
         raise SystemExit(
-            "The default lmp_dataset.jsonl is documented as template-generated "
-            "with simulated scores. No human-performance metrics will be computed. "
-            "Use a genuinely human-annotated held-out CSV/JSONL, or pass "
-            "--allow-simulated-label-metrics only for a labelled smoke test."
+            "This dataset is identified as synthetic/simulated. No human-performance "
+            "metrics will be computed, even if --human-labels-verified is supplied. "
+            "Use --allow-simulated-label-metrics only for a clearly labelled smoke test."
         )
     if not known_synthetic and not args.human_labels_verified:
         raise SystemExit(
-            "For a non-default dataset, confirm that labels are genuinely human-rated, "
+            "For a non-synthetic dataset, confirm that labels are genuinely human-rated, "
             "independently reviewed/adjudicated, and held out by source clause using "
             "--human-labels-verified. This flag is an explicit user attestation, not an audit."
         )
-
-    df = load_dataset(args.data)
     required = {"original", "simplified", "lmp_score", "language"}
     missing = required - set(df.columns)
     if missing:
@@ -94,7 +99,7 @@ def main(args):
         predictions,
     )
     evidence_type = (
-        "SIMULATED_LABEL_SMOKE_TEST_ONLY"
+        "SYNTHETIC_LABEL_SMOKE_TEST_ONLY"
         if known_synthetic
         else "USER_ATTESTED_HUMAN_LABELS_REQUIRES_AUDIT"
     )
@@ -106,7 +111,7 @@ def main(args):
         "n": int(len(df)),
         "metrics_against_dataset_labels": metrics,
         "warning": (
-            "Synthetic-label smoke test only; do not report as human-validated performance."
+            "Synthetic/simulated-label smoke test only; do not report as human-validated performance."
             if known_synthetic
             else "User attested human labels. Independently audit annotation provenance, adjudication and split integrity before publication."
         ),
