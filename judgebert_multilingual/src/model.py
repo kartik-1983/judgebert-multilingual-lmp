@@ -1,40 +1,34 @@
 """
 JUDGEBERT-inspired multilingual regression model for Legal Meaning Preservation.
 
-Architecture (following the original JUDGEBERT / MeaningBERT design):
-- Base: XLM-RoBERTa-base (multilingual)
-- Input: [CLS] original [SEP] simplified [SEP]
-- Head: Regression head (linear layer) on the [CLS] representation
-- Loss: MSE (or SmoothL1)
-- Output: continuous LMP score in [1, 10]
+Improvements over basic version:
+- Mean pooling over the sequence (masked) instead of only [CLS]
+  (often more robust for sentence-pair regression)
+- Slightly deeper / better-initialized regression head
+- Clean separation of encoder and head for layer-wise learning rates
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 
 import torch
 import torch.nn as nn
-from transformers import (
-    AutoModel,
-    AutoTokenizer,
-    AutoConfig,
-    PreTrainedModel,
-)
+from transformers import AutoModel, AutoTokenizer, AutoConfig
 
 
 class JudgeBERTRegressor(nn.Module):
-    """
-    Multilingual JUDGEBERT-style model.
-    """
+    """Multilingual JUDGEBERT-style LMP regression model."""
 
     def __init__(
         self,
         model_name: str = "xlm-roberta-base",
-        dropout: float = 0.1,
+        dropout: float = 0.15,
         freeze_base: bool = False,
+        use_mean_pooling: bool = True,
     ):
         super().__init__()
         self.config = AutoConfig.from_pretrained(model_name)
         self.encoder = AutoModel.from_pretrained(model_name)
+        self.use_mean_pooling = use_mean_pooling
         hidden_size = self.config.hidden_size
 
         if freeze_base:
@@ -42,19 +36,32 @@ class JudgeBERTRegressor(nn.Module):
                 param.requires_grad = False
 
         self.dropout = nn.Dropout(dropout)
+
+        # Stronger regression head
         self.regressor = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.GELU(),
+            nn.Dropout(dropout),
             nn.Linear(hidden_size, hidden_size // 2),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(hidden_size // 2, 1),
         )
 
-        # Initialize the regression head
+        # Xavier init for the head
         for module in self.regressor:
             if isinstance(module, nn.Linear):
                 nn.init.xavier_uniform_(module.weight)
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
+
+    def _mean_pooling(self, last_hidden_state: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+        """Masked mean pooling."""
+        # last_hidden_state: (B, T, H), attention_mask: (B, T)
+        mask = attention_mask.unsqueeze(-1).float()  # (B, T, 1)
+        summed = torch.sum(last_hidden_state * mask, dim=1)
+        counts = torch.clamp(mask.sum(dim=1), min=1e-9)
+        return summed / counts
 
     def forward(
         self,
@@ -67,22 +74,28 @@ class JudgeBERTRegressor(nn.Module):
             attention_mask=attention_mask,
             return_dict=True,
         )
-        # Use [CLS] token representation
-        cls_repr = outputs.last_hidden_state[:, 0, :]
-        cls_repr = self.dropout(cls_repr)
-        logits = self.regressor(cls_repr).squeeze(-1)  # (batch,)
+        last_hidden = outputs.last_hidden_state  # (B, T, H)
 
-        # Clamp predictions to sensible range
+        if self.use_mean_pooling:
+            pooled = self._mean_pooling(last_hidden, attention_mask)
+        else:
+            pooled = last_hidden[:, 0, :]  # [CLS]
+
+        pooled = self.dropout(pooled)
+        logits = self.regressor(pooled).squeeze(-1)  # (B,)
+
+        # Soft clamp via sigmoid scaling is possible, but hard clamp is fine for training stability
         preds = torch.clamp(logits, 1.0, 10.0)
 
         loss = None
         if labels is not None:
-            loss_fct = nn.SmoothL1Loss()
+            # SmoothL1 is robust to outliers
+            loss_fct = nn.SmoothL1Loss(beta=1.0)
             loss = loss_fct(preds, labels.float())
 
         return {
             "loss": loss,
-            "logits": preds,
+            "logits": logits,          # unclamped for potential ranking losses later
             "predictions": preds,
         }
 
