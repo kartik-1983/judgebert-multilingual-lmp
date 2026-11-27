@@ -1,7 +1,7 @@
-# Explainable Multilingual Legal Meaning Preservation Using JUDGEBERT
+# Explainable Multilingual Legal Meaning Preservation Using JUDGEBERT (PreserveLex)
 
 **CSET 346 – Natural Language Processing**  
-**Project Title:** Explainable Multilingual Legal Meaning Preservation Using JUDGEBERT
+**Project Title:** Explainable Multilingual Legal Meaning Preservation Using JUDGEBERT / PreserveLex
 
 This repository implements a professional extension of the JUDGEBERT framework (Beauchemin et al., EMNLP 2025) to **English + Hindi** legal text, focusing on Legal Meaning Preservation (LMP) between original and simplified legal sentences.
 
@@ -10,23 +10,24 @@ This repository implements a professional extension of the JUDGEBERT framework (
 Legal text simplification must preserve legally critical elements (obligations, conditions, exceptions, scope, dates, permissions). Generic semantic similarity metrics often fail on these. This project:
 
 - Creates a bilingual (English + Hindi) dataset of original–simplified legal sentence pairs with LMP annotations (1–10 scale).
-- Implements strong baselines (SBERT cosine similarity, BERTScore).
+- Implements baselines: **TF-IDF cosine**, multilingual Sentence-BERT, and BERTScore.
 - Fine-tunes a multilingual transformer (XLM-RoBERTa) as a JUDGEBERT-inspired regression model for LMP prediction.
-- Adds explainability (attention-based and error-type analysis).
+- Adds explainability (rule-based advisory dimensions + error-type analysis).
 - Conducts the required experiments: language comparison, domain generalization, sanity checks, and qualitative error analysis.
 
-**Research Question:** How effectively can a JUDGEBERT-based model assess legal meaning preservation in a new language (Hindi) and legal domain, and does it outperform generic semantic-similarity approaches?
+**Research Question:** How effectively can a JUDGEBERT-based model assess legal meaning preservation in a new language (Hindi) and legal domain, and does it outperform generic semantic-similarity / lexical approaches?
 
 ## Key Features
 
-- **Languages:** English + Hindi (Indian language)
+- **Languages:** English + Hindi
 - **Domain:** Property / General Insurance + Indian Contract Act style clauses
-- **Dataset:** ≥ 300 original–simplified pairs with simulated human LMP scores + error type annotations
-- **Models:** 
-  - Baselines: Sentence-BERT (all-MiniLM / paraphrase-multilingual), BERTScore
+- **Dataset:** ≥ 300 original–simplified pairs with simulated human LMP scores + error type annotations (synthetic / template-based; not human gold)
+- **Models / Baselines:** 
+  - Lexical: TF-IDF (1–2 gram) cosine similarity
+  - Semantic: Sentence-BERT (paraphrase-multilingual), BERTScore (XLM-RoBERTa)
   - Main model: XLM-RoBERTa-base fine-tuned for regression on sentence pairs
-- **Evaluation:** Pearson correlation, RMSE, MAE, Spearman; sanity checks; qualitative analysis of ≥15 hard cases
-- **Explainability:** Error taxonomy (omission, hallucination, contradiction, obligation/permission change, condition/exception/scope/date/entity errors) + short natural-language explanations
+- **Evaluation:** Pearson, Spearman, RMSE, MAE; sanity checks; qualitative analysis
+- **Explainability:** Five advisory review dimensions (obligations, rights/permissions, deadlines/amounts, conditions/exceptions, scope/parties) + short explanations
 
 ## Repository Structure
 
@@ -35,7 +36,7 @@ judgebert_multilingual/
 ├── data/                   # Dataset files (JSONL / CSV)
 ├── src/                    # Source code
 │   ├── data_generation.py  # Synthetic data + annotation simulation
-│   ├── baselines.py        # SBERT & BERTScore baselines
+│   ├── baselines.py        # TF-IDF, SBERT & BERTScore baselines
 │   ├── model.py            # JUDGEBERT-style regression model
 │   ├── train.py            # Training script
 │   ├── evaluate.py         # Evaluation + metrics
@@ -58,7 +59,7 @@ pip install -r requirements.txt
 # 2. Generate / load the dataset
 python src/data_generation.py
 
-# 3. Run baselines
+# 3. Run baselines (TF-IDF + SBERT + BERTScore)
 python src/baselines.py
 
 # 4. Train the JUDGEBERT-inspired model
@@ -81,21 +82,28 @@ The dataset contains original–simplified pairs in English and Hindi drawn from
 - `explanation` (short text)
 
 **Annotation Procedure (documented):**  
-Simulated following the original paper’s methodology (majority / average of multiple raters). Real student projects should replace scores with genuine human annotations from law students or domain experts using the provided guidelines in `docs/annotation_guidelines.md`.
+Simulated following the original paper’s methodology. Real student projects should replace scores with genuine human annotations from law students or domain experts using the guidelines in `docs/annotation_guidelines.md`.
 
 ## Experiments (as required)
 
-1. **Generic semantic similarity vs. JUDGEBERT-based LMP prediction**
-2. **Performance comparison across English and Hindi**
-3. **Generalization** to a second legal domain or contextual vs. sentence-only input
-4. **Sanity checks**: identical pairs → high LMP; unrelated pairs → low LMP
-5. **Qualitative error analysis** on ≥15 legally difficult examples (omissions, contradictions, obligation changes, etc.)
+1. Generic semantic / lexical similarity vs. JUDGEBERT-based LMP prediction
+2. Performance comparison across English and Hindi
+3. Generalization / out-of-domain diagnostic (e.g., ASSET)
+4. Sanity checks: identical pairs → high LMP; unrelated pairs → low LMP
+5. Qualitative error analysis on legally difficult examples
+
+## Current Evidence Status (Important)
+
+- Primary development corpus uses **simulated / template-generated labels**.
+- No independently annotated human gold test set is claimed.
+- Out-of-domain diagnostic on ASSET (general text) shows TF-IDF currently stronger than the legal-specialized model (expected, because ASSET is not legal).
+- Superiority claims over JUDGEBERT or generic baselines require a common, source-clause-disjoint, human-annotated legal test set.
 
 ## Expected System Output (per pair)
 
 - **LMP Score:** 1–10  
 - **Decision:** Preserved / Partially Preserved / Not Preserved  
-- **Optional legal error type(s)**  
+- **Optional legal error type(s)** / advisory dimension warnings  
 - **Short explanation** of the legal meaning change
 
 ## Deliverables
@@ -123,4 +131,4 @@ This educational project is released for academic use. When using the code or id
 
 ---
 
-*Built as a professional, reproducible extension of JUDGEBERT for multilingual (English–Hindi) legal meaning preservation.*
+*Built as a professional, reproducible extension of JUDGEBERT for multilingual (English–Hindi) legal meaning preservation. Claims of superiority are reserved for future human-annotated evaluation.*
