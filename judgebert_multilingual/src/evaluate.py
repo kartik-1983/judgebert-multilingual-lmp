@@ -56,6 +56,12 @@ def main(args):
             "Use a genuinely human-annotated held-out CSV/JSONL, or pass "
             "--allow-simulated-label-metrics only for a labelled smoke test."
         )
+    if not known_synthetic and not args.human_labels_verified:
+        raise SystemExit(
+            "For a non-default dataset, confirm that labels are genuinely human-rated, "
+            "independently reviewed/adjudicated, and held out by source clause using "
+            "--human-labels-verified. This flag is an explicit user attestation, not an audit."
+        )
 
     df = load_dataset(args.data)
     required = {"original", "simplified", "lmp_score", "language"}
@@ -89,8 +95,8 @@ def main(args):
     )
     evidence_type = (
         "SIMULATED_LABEL_SMOKE_TEST_ONLY"
-        if known_synthetic or args.allow_simulated_label_metrics
-        else "LABEL_PROVENANCE_REQUIRES_EXTERNAL_VERIFICATION"
+        if known_synthetic
+        else "USER_ATTESTED_HUMAN_LABELS_REQUIRES_AUDIT"
     )
     results = {
         "model_name": model_name,
@@ -122,6 +128,11 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", default="results")
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--max_length", type=int, default=256)
+    parser.add_argument(
+        "--human-labels-verified",
+        action="store_true",
+        help="Attest that the input contains genuinely human-rated, adjudicated, held-out labels.",
+    )
     parser.add_argument(
         "--allow-simulated-label-metrics",
         action="store_true",
